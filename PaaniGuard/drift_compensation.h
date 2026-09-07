@@ -33,7 +33,10 @@ float drift_applyTemperatureCompensation(float rawTdsPpm, float temperatureC);
 
 // Record a new calibration checkpoint — call when the probe is dipped in
 // the known TDS_REFERENCE_PPM reference solution. Persists to flash.
-void drift_recordCheckpoint(float measuredPpm);
+// dayIndexOverride defaults to "today" (drift_getCurrentDayIndex()); an
+// explicit value is only for backfilling historical checkpoints or for
+// SIMULATION_MODE testing without waiting real calendar days.
+void drift_recordCheckpoint(float measuredPpm, int32_t dayIndexOverride = -1);
 
 // Mechanism 2: apply the rolling-baseline linear-trend correction (uses
 // checkpoints from the last DRIFT_WINDOW_DAYS days). If fewer than 2

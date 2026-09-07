@@ -95,9 +95,9 @@ void drift_syncDayIndexFromEpoch(time_t epochSeconds) {
   saveState();
 }
 
-void drift_recordCheckpoint(float measuredPpm) {
+void drift_recordCheckpoint(float measuredPpm, int32_t dayIndexOverride) {
   DriftCheckpoint cp;
-  cp.dayIndex = drift_getCurrentDayIndex();
+  cp.dayIndex = (dayIndexOverride >= 0) ? (uint32_t)dayIndexOverride : drift_getCurrentDayIndex();
   cp.measuredPpm = measuredPpm;
 
   if (state.checkpointCount < DRIFT_MAX_CHECKPOINTS) {

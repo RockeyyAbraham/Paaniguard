@@ -19,9 +19,11 @@ static DallasTemperature dallas(&oneWire);
 
 static volatile unsigned long flowPulseCount = 0;
 static unsigned long lastFlowCalcMillis = 0;
-static unsigned long lastFlowPulseSnapshot = 0;
 static float totalLitersAccum = 0.0;
+#if !SIMULATION_MODE
+static unsigned long lastFlowPulseSnapshot = 0;
 static float lastFlowRateLPM = 0.0;
+#endif
 
 void IRAM_ATTR sensors_flowISR() {
   flowPulseCount++;
@@ -51,6 +53,7 @@ void sensors_init() {
   lastFlowCalcMillis = millis();
 }
 
+#if !SIMULATION_MODE
 // Converts accumulated ISR pulse counts (since the last call) into an
 // instantaneous flow rate and adds to the running liters total. Returns
 // the previous rate unchanged if called again too soon to be meaningful.
@@ -71,6 +74,7 @@ static float computeFlowRateLPM() {
   lastFlowRateLPM = liters / minutes;
   return lastFlowRateLPM;
 }
+#endif
 
 void sensors_read(SensorReadings &out) {
   out.timestamp = millis();
