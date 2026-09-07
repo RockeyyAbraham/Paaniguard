@@ -7,6 +7,10 @@
 #include "fingerprinting.h"
 #include "actuators.h"
 #include "display.h"
+#include "connectivity.h"
+#include "webserver.h"
+#include "cloud_logging.h"
+#include "storage.h"
 
 static unsigned long lastSensorReadMillis = 0;
 
@@ -23,9 +27,18 @@ void setup() {
   drift_init();
   actuators_init();
   display_init();
+  storage_init();
+  connectivity_init();
+  webserver_init();
+  cloud_logging_init();
 }
 
 void loop() {
+  // Web server must stay responsive every loop iteration, independent of
+  // the slower sensor-read cadence below.
+  webserver_handleClient();
+  connectivity_maybeSyncTime();
+
   if (millis() - lastSensorReadMillis < SENSOR_READ_INTERVAL_MS) {
     return;
   }
@@ -35,8 +48,24 @@ void loop() {
   sensors_read(r);
   float correctedTds = drift_getCorrectedTds(r.tds_raw_ppm, r.temperatureC);
   FingerprintResult fingerprint = fingerprint_evaluate(r.ph_value, correctedTds);
+
+  // Offline-first safety response: identical whether connectivity_isOnline()
+  // is true or false.
   actuators_applyFingerprint(fingerprint);
   display_render(r, correctedTds, fingerprint);
+
+  StoredRecord rec;
+  rec.timestamp = r.timestamp;
+  rec.ph = r.ph_value;
+  rec.correctedTdsPpm = correctedTds;
+  rec.temperatureC = r.temperatureC;
+  rec.flowRateLPM = r.flowRateLPM;
+  rec.totalLiters = r.totalLiters;
+  rec.severity = (uint8_t)fingerprint.severity;
+  storage_appendRecord(rec);
+
+  webserver_updateStatus(r, correctedTds, fingerprint);
+  cloud_logging_maybePush(r, correctedTds, fingerprint);
 
   Serial.print(F("pH="));
   Serial.print(r.ph_value);
