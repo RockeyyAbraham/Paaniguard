@@ -4,6 +4,9 @@
 #include "config.h"
 #include "sensors.h"
 #include "drift_compensation.h"
+#include "fingerprinting.h"
+#include "actuators.h"
+#include "display.h"
 
 static unsigned long lastSensorReadMillis = 0;
 
@@ -18,6 +21,8 @@ void setup() {
 
   sensors_init();
   drift_init();
+  actuators_init();
+  display_init();
 }
 
 void loop() {
@@ -29,6 +34,9 @@ void loop() {
   SensorReadings r;
   sensors_read(r);
   float correctedTds = drift_getCorrectedTds(r.tds_raw_ppm, r.temperatureC);
+  FingerprintResult fingerprint = fingerprint_evaluate(r.ph_value, correctedTds);
+  actuators_applyFingerprint(fingerprint);
+  display_render(r, correctedTds, fingerprint);
 
   Serial.print(F("pH="));
   Serial.print(r.ph_value);
@@ -41,5 +49,9 @@ void loop() {
   Serial.print(F(" flowLPM="));
   Serial.print(r.flowRateLPM);
   Serial.print(F(" totalL="));
-  Serial.println(r.totalLiters);
+  Serial.print(r.totalLiters);
+  Serial.print(F(" severity="));
+  Serial.print((int)fingerprint.severity);
+  Serial.print(F(" shutoff="));
+  Serial.println(fingerprint.triggerShutoff ? "YES" : "no");
 }

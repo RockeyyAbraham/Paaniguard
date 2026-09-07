@@ -3,11 +3,11 @@
 
 #include "sensors.h"
 #include "config.h"
+#include <Wire.h>
 
 #if SIMULATION_MODE
 #include "simulation.h"
 #else
-#include <Wire.h>
 #include <Adafruit_ADS1X15.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
@@ -35,10 +35,14 @@ unsigned long sensors_getFlowPulseCount() {
 }
 
 void sensors_init() {
+  // Wire is started here (not inside the #else below) because the I2C bus
+  // is shared with the OLED (display.cpp), which is real hardware even
+  // when SIMULATION_MODE fakes the pH/TDS/temperature/flow readings.
+  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+
 #if SIMULATION_MODE
   simulation_init();
 #else
-  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
   ads.begin(ADS1115_I2C_ADDRESS);
   dallas.begin();
   pinMode(PIN_FLOW_SENSOR, INPUT_PULLUP);
