@@ -2,6 +2,10 @@
 // included below; this file just wires them together in order.
 
 #include "config.h"
+#include "sensors.h"
+#include "drift_compensation.h"
+
+static unsigned long lastSensorReadMillis = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -11,7 +15,31 @@ void setup() {
 #if SIMULATION_MODE
   Serial.println(F("SIMULATION_MODE=1 — running on synthetic sensor data, no hardware required."));
 #endif
+
+  sensors_init();
+  drift_init();
 }
 
 void loop() {
+  if (millis() - lastSensorReadMillis < SENSOR_READ_INTERVAL_MS) {
+    return;
+  }
+  lastSensorReadMillis = millis();
+
+  SensorReadings r;
+  sensors_read(r);
+  float correctedTds = drift_getCorrectedTds(r.tds_raw_ppm, r.temperatureC);
+
+  Serial.print(F("pH="));
+  Serial.print(r.ph_value);
+  Serial.print(F(" rawTDS="));
+  Serial.print(r.tds_raw_ppm);
+  Serial.print(F(" correctedTDS="));
+  Serial.print(correctedTds);
+  Serial.print(F(" tempC="));
+  Serial.print(r.temperatureC);
+  Serial.print(F(" flowLPM="));
+  Serial.print(r.flowRateLPM);
+  Serial.print(F(" totalL="));
+  Serial.println(r.totalLiters);
 }
