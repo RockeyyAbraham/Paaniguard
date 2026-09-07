@@ -7,9 +7,9 @@
 // This is what stands in for a live Serial capture until real hardware is
 // available — see README.md.
 
-#include "../PaaniGuard/config.h"
-#include "../PaaniGuard/drift_compensation.h"
-#include "../PaaniGuard/fingerprinting.h"
+#include "../config.h"
+#include "../drift_compensation.h"
+#include "../fingerprinting.h"
 #include <cstdio>
 
 static const char *severityName(Severity s) {
