@@ -21,12 +21,28 @@ real hardware" and "Running without a board" below.
 | `cloud_logging.h` / `.cpp` | ThingSpeak push |
 | `storage.h` / `.cpp` | LittleFS ring buffer of readings, survives reboot |
 | `simulation.h` / `.cpp` | Synthetic sensor data for `SIMULATION_MODE` |
+| `libraries.txt` | Libraries used by the production firmware |
+| `wokwi/` | Experimental ESP32 target; production ESP8266 code is unchanged |
 
-All of the above live directly in this repo root — it's the Arduino sketch
-folder itself (the `.ino` and its folder must share the containing repo's
-name for the Arduino IDE to recognize it). The only other folder,
-`host_sim/`, is a separate native test harness (not part of the firmware),
-explained under "Running without a board".
+The production files live directly in this repo root because it is the Arduino
+sketch folder itself (the `.ino` and its folder must share the containing
+folder's name for the Arduino IDE to recognize it). `host_sim/` is a separate
+native test harness, and `wokwi/` is a separate ESP32 experiment.
+
+The older monolithic sketch is retained under `legacy/test.ino` so it remains
+available for reference without being compiled as a second sketch. The former
+root-level ESP32 Wokwi metadata is retained as
+`legacy/experimental-root-diagram.json` and
+`legacy/experimental-root-wokwi.toml`.
+The production modules stay at the sketch root because Arduino IDE/CLI
+compiles the root `.cpp` files automatically; moving them into `src/` would
+require a different build layout and could break the existing Arduino flow.
+
+The browser-based logic simulator lives in `virtual-simulation/`. It is a
+separate software validation environment that mirrors source-defined behavior
+without executing the ESP8266 firmware or claiming electrical validation. Open
+`virtual-simulation/index.html` directly, or serve that folder with a static
+HTTP server as described in its README.
 
 ## Pin map
 
@@ -86,6 +102,74 @@ arduino-cli core install esp8266:esp8266
 arduino-cli lib install "Adafruit ADS1X15" "OneWire" "DallasTemperature" "Adafruit SSD1306" "Adafruit GFX Library" "Adafruit NeoPixel" "ThingSpeak"
 arduino-cli compile --fqbn esp8266:esp8266:nodemcuv2 .
 ```
+
+## Wokwi limitation
+
+The production firmware is ESP8266-specific and remains unchanged. The
+installed Wokwi VS Code extension (3.7.0) does not provide a usable
+`wokwi-nodemcu-v2` or ESP8266 board model for `diagram.json`; the extension's
+ESP8266 reference is for upload/debug tooling, not a Wokwi virtual board.
+Therefore an exact Wokwi simulation of the production ESP8266 firmware is not
+available in this environment. Do not treat an ESP32 diagram as an ESP8266
+simulation and do not flash the ESP32 sketch to ESP8266 hardware.
+
+The existing `wokwi/` directory is retained as a separate ESP32 compatibility
+experiment only. It is not the production firmware, does not validate
+ESP8266-specific behavior, and must not be used as evidence that the physical
+ESP8266 build works. It preserves the production project's logical GPIO
+numbers only to exercise generic peripheral behavior:
+
+| Function | Production ESP8266 | Wokwi ESP32 GPIO |
+|---|---|---:|
+| DS18B20 | D6 / GPIO12 | GPIO12 |
+| Flow pulse | D5 / GPIO14 | GPIO14 |
+| Relay | D7 / GPIO13 | GPIO13 |
+| WS2812B | D4 / GPIO2 | GPIO2 |
+| Buzzer | D0 / GPIO16 | GPIO16 |
+| OLED SDA | D2 / GPIO4 | GPIO4 |
+| OLED SCL | D1 / GPIO5 | GPIO5 |
+
+The compatibility experiment exercises generic DS18B20, flow input, relay,
+buzzer, WS2812B, OLED, WiFi status page, drift compensation, and alert
+behavior. TDS and pH remain simulated. It does not execute the root
+`Paaniguard.ino` or its ESP8266 modules.
+
+Install the ESP32 Arduino core once:
+
+```
+arduino-cli core install esp32:esp32
+```
+
+Build the virtual firmware artifact used by `wokwi/wokwi.toml` from the
+repository root:
+
+```
+arduino-cli compile --fqbn esp32:esp32:esp32 --build-path wokwi/build --export-binaries wokwi
+```
+
+To run that compatibility experiment, open the `wokwi/` folder as the VS Code
+workspace, open its `diagram.json`, and start Wokwi. This is optional and is
+not a substitute for compiling and bench-testing the ESP8266 firmware. See
+`wokwi/README.md` for the separation and exact commands.
+
+For the real target, compile the root project with the ESP8266 board package,
+then verify the physical wiring against the pin table above. The flow
+pushbutton in the compatibility experiment is only a simulation substitute;
+the physical device requires a correctly level-shifted/open-collector flow
+sensor output.
+
+### Electrical build notes
+
+- The DS18B20 data line has the required 4.7 kOhm pull-up to 3.3 V.
+- The physical YF-S201 flow output must never drive an ESP8266/ESP32 GPIO
+  above 3.3 V. Use its open-collector configuration with a 3.3 V pull-up, or
+  add a proper level shifter before connecting it to GPIO14.
+- The virtual relay module is only a logic simulation. For the physical
+  solenoid, use a separately rated supply, an appropriately rated relay or
+  MOSFET driver, a fuse, and flyback suppression. Do not power a 12 V valve
+  from the microcontroller 3.3 V rail.
+- Keep sensor/logic ground common at the controller. The physical relay's
+  high-voltage or 12 V load wiring must remain isolated from the GPIO side.
 
 Compiles clean: 0 errors, 0 warnings in any PaaniGuard file, with
 `--warnings all`. (The bundled ThingSpeak library itself emits 2 unused-

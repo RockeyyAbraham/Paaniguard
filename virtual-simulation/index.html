@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PaaniGuard Virtual Hardware Simulator</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">PaaniGuard / validation bench</p>
+      <h1>Virtual Hardware Simulator</h1>
+    </div>
+    <div class="badges">
+      <span class="badge production">Production: ESP8266</span>
+      <span class="badge virtual">Simulation only</span>
+      <span class="badge warn">Not electrical validation</span>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="hero-strip">
+      <div><span class="status-dot" id="status-dot"></span><strong id="status-title">SAFE</strong><span id="status-message">Water quality within normal parameters.</span></div>
+      <div class="clock"><span id="clock-state">PAUSED</span><strong id="clock-value">00:00:00</strong><button class="icon-button" id="clock-toggle" title="Start or pause simulation">Start</button><button class="ghost-button" id="clock-reset">Reset</button></div>
+    </section>
+
+    <section class="dashboard-grid">
+      <div class="panel controls-panel">
+        <div class="panel-heading"><div><p class="eyebrow">Input bench</p><h2>Sensor controls</h2></div><select id="mode-select" aria-label="Control mode"><option value="manual">Manual mode</option><option value="scenario">Scenario mode</option></select></div>
+        <div class="scenario-row"><label for="scenario-select">Scenario</label><select id="scenario-select"><option value="normal">Normal water</option><option value="low-ph">Low pH / acidic</option><option value="high-ph">High pH / alkaline</option><option value="high-tds">High TDS</option><option value="flow">Abnormal flow</option><option value="multi">Multi-parameter anomaly</option><option value="drift">Sensor drift</option></select></div>
+        <div class="control-grid">
+          <label>Temperature <output id="temperature-output">25.0 °C</output><input id="temperature" type="range" min="0" max="60" step="0.1" value="25"></label>
+          <label>pH <output id="ph-output">7.00</output><input id="ph" type="range" min="0" max="14" step="0.01" value="7"></label>
+          <label>TDS <output id="tds-output">342 ppm</output><input id="tds" type="range" min="0" max="3000" step="1" value="342"></label>
+          <label>Flow <output id="flow-output">4.0 L/min</output><input id="flow" type="range" min="0" max="20" step="0.1" value="4"></label>
+          <label>Sensor drift <output id="drift-output">0 ppm/day</output><input id="drift" type="range" min="0" max="100" step="1" value="0"></label>
+          <label>Noise <output id="noise-output">0.0</output><input id="noise" type="range" min="0" max="1" step="0.01" value="0"></label>
+        </div>
+        <div class="control-footer"><span>Virtual sensors are simulated and not calibrated.</span><span>Flow constant: <b>450 pulses/L placeholder</b></span></div>
+      </div>
+
+      <div class="panel readings-panel"><div class="panel-heading"><div><p class="eyebrow">Processing adapter</p><h2>Live readings</h2></div><span class="chip">SIMULATED</span></div><div class="metric-grid" id="metric-grid"></div><div class="subreading"><span>Sensor drift estimate</span><strong id="drift-estimate">0.0 ppm</strong></div></div>
+
+      <div class="panel oled-panel"><div class="panel-heading"><div><p class="eyebrow">SSD1306 / 0x3C</p><h2>OLED preview</h2></div><span class="chip">I2C</span></div><div class="oled" id="oled"><div>PAANIGUARD</div><div>pH: <span id="oled-ph">7.00</span></div><div>TDS: <span id="oled-tds">342</span> ppm</div><div>Temp: <span id="oled-temp">25.0</span> C</div><div>Flow: <span id="oled-flow">4.0</span> L/min</div><div>Status: <span id="oled-status">OK</span></div></div></div>
+
+      <div class="panel actuators-panel"><div class="panel-heading"><div><p class="eyebrow">Safety response</p><h2>Actuator state</h2></div><span class="chip" id="response-chip">NORMAL</span></div><div class="actuator-list"><div class="actuator"><span class="led-orb" id="led-orb"></span><div><strong>WS2812B status</strong><small id="led-label">Dim green / safe</small></div></div><div class="actuator"><span class="state-icon" id="buzzer-icon">OFF</span><div><strong>Active buzzer</strong><small id="buzzer-label">Silent</small></div></div><div class="actuator"><span class="state-icon" id="relay-icon">LOW</span><div><strong>Relay output / GPIO13</strong><small id="relay-label">De-energized; production code keeps valve closed</small></div></div><div class="actuator"><span class="state-icon" id="solenoid-icon">CLOSED</span><div><strong>Virtual solenoid</strong><small>Logical representation only; no 12 V hardware</small></div></div></div></div>
+
+      <div class="panel architecture-panel"><div class="panel-heading"><div><p class="eyebrow">System topology</p><h2>Virtual representation</h2></div><span class="chip">NOT REAL WIRING</span></div><div class="architecture"><div class="arch-block sensors"><b>SENSORS</b><span>DS18B20</span><span>pH / TDS</span><span>YF-S201</span></div><div class="arch-arrow">→</div><div class="arch-block processor"><b>PAANIGUARD</b><span>ESP8266 logic adapter</span><span>ADS1115 · 0x48</span></div><div class="arch-arrow">→</div><div class="arch-block outputs"><b>OUTPUTS</b><span>OLED · LED</span><span>Buzzer · Relay</span><span>Solenoid state</span></div></div><div class="architecture-note">Production GPIO labels are retained for traceability. The browser is not simulating ESP8266 electrical behavior.</div></div>
+
+      <div class="panel detail-panel"><div class="panel-heading"><div><p class="eyebrow">ADC adapter / calibration ledger</p><h2>Analog path</h2></div><span class="chip">PLACEHOLDER CURVES</span></div><div class="analog-table"><div><span>ADS1115</span><b>0x48</b></div><div><span>A0 → pH voltage</span><b id="ph-voltage">1.00 V</b></div><div><span>A1 → TDS voltage</span><b id="tds-voltage">0.40 V</b></div><div><span>ADC gain</span><b>Default 2/3</b></div><div><span>Flow pulses</span><b id="pulse-count">0</b></div><div><span>Total liters</span><b id="liters">0.00 L</b></div><div><span>Storage</span><b>IN-MEMORY</b></div><div><span>Cloud logging</span><b>OFFLINE / SKIPPED</b></div></div><p class="note">pH/TDS constants come from the current production source but are marked placeholders. Virtual values are not physical calibration results.</p></div>
+    </section>
+
+    <section class="lower-grid"><div class="panel log-panel"><div class="panel-heading"><div><p class="eyebrow">Production-style output</p><h2>Serial monitor</h2></div><button class="ghost-button" id="clear-log">Clear</button></div><pre id="serial-log" aria-live="polite"></pre></div><div class="panel event-panel"><div class="panel-heading"><div><p class="eyebrow">State transitions</p><h2>Event log</h2></div><span class="chip" id="event-count">0 events</span></div><div id="event-log"></div></div></section>
+
+    <section class="panel test-panel"><div class="panel-heading"><div><p class="eyebrow">Verification matrix</p><h2>Manual test cases</h2></div><span class="chip">SOURCE-BASED</span></div><div class="tests" id="test-list"></div></section>
+  </main>
+  <footer><span>Production source of truth: root PaaniGuard ESP8266 firmware</span><span>Virtual adapter: <a href="README.md">virtual-simulation/README.md</a></span></footer>
+  <script src="app.js"></script>
+</body>
+</html>
