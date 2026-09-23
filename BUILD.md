@@ -419,11 +419,30 @@ Record the result:
 > **STOP — TEST GATE 6A**
 > You now know your board's polarity.
 >
-> Most modules are **active-LOW**: LOW closes the contact.
-> `config.h` line 52 assumes the opposite. If your board is active-LOW, the firmware's
-> safety logic runs inverted and must be fixed **before** the valve is plumbed.
+> Most modules are **active-LOW**: LOW closes the contact. The firmware ships assuming
+> **active-HIGH**. If your board is active-LOW, the safety logic runs inverted — the valve
+> would sit open on boot and on every reset — and it must be corrected **before** the valve
+> is plumbed.
 >
-> Write your result in the project notes. This reading is evidence for the report.
+> The fix is one line. In `config.h`, swap these two:
+>
+> ```c
+> #define RELAY_LEVEL_VALVE_OPEN    HIGH
+> #define RELAY_LEVEL_VALVE_CLOSED  LOW
+> ```
+>
+> to:
+>
+> ```c
+> #define RELAY_LEVEL_VALVE_OPEN    LOW
+> #define RELAY_LEVEL_VALVE_CLOSED  HIGH
+> ```
+>
+> Never edit `actuators.cpp` for this. The drive levels are isolated in `config.h`
+> specifically so a polarity flip stays a one-line change.
+>
+> Write your result in the build log at the end of this manual. This reading is evidence
+> for the report.
 
 ### Step 19
 

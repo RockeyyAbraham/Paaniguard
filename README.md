@@ -155,15 +155,40 @@ not a substitute for compiling and bench-testing the ESP8266 firmware. See
 For the real target, compile the root project with the ESP8266 board package,
 then verify the physical wiring against the pin table above. The flow
 pushbutton in the compatibility experiment is only a simulation substitute;
-the physical device requires a correctly level-shifted/open-collector flow
-sensor output.
+the physical device requires the flow sensor output to be divided down or
+level-shifted before it reaches a GPIO — see "Electrical build notes" below.
+An open-collector pull-up alone is not sufficient.
 
 ### Electrical build notes
 
+See `BUILD.md` for the full step-by-step wiring sequence with test gates.
+
 - The DS18B20 data line has the required 4.7 kOhm pull-up to 3.3 V.
 - The physical YF-S201 flow output must never drive an ESP8266/ESP32 GPIO
-  above 3.3 V. Use its open-collector configuration with a 3.3 V pull-up, or
-  add a proper level shifter before connecting it to GPIO14.
+  above 3.3 V. The YF-S201 needs 4.5 V minimum, so running it at 3.3 V to
+  dodge the problem is out of spec and not an option. Power it from 5 V and
+  drop the yellow signal line with a resistive divider: 1.8 kOhm in series
+  from the sensor signal, then 3.3 kOhm from that junction to GND, with the
+  junction going to GPIO14/D5. That gives ~3.24 V. A 10 kOhm / 20 kOhm pair
+  also lands in range (3.33 V) but is higher impedance and gives a slower
+  pulse edge. A dedicated level shifter is also valid. An external pull-up
+  alone does NOT work: the sensor's own PCB already pulls the open-collector
+  hall output up to its VCC rail, so the node still sits near 5 V (~3.7 V or
+  more) and the GPIO still sees an over-voltage.
+- The common 1-channel opto-isolated relay module is typically ACTIVE-LOW
+  (IN pulled LOW energises the coil), which is the opposite of the
+  active-HIGH assumption the firmware currently ships with. Measure the
+  polarity on the actual board with a multimeter before the solenoid is
+  plumbed (`BUILD.md`, BAG 6, Step 18). If it is active-LOW, swap
+  `RELAY_LEVEL_VALVE_OPEN` and `RELAY_LEVEL_VALVE_CLOSED` in `config.h` —
+  the drive levels are isolated there specifically so a polarity flip is a
+  one-line change and never requires editing `actuators.cpp`.
+- Feed the relay module's logic-side VCC from 3.3 V, not 5 V. At 5 V the IN
+  pin becomes a 5 V node that a 3.3 V GPIO cannot drive cleanly, and it
+  floats toward 4 V while the GPIO is high-impedance during boot/reset,
+  back-feeding a pin that is not 5 V tolerant. If the board has a JD-VCC
+  jumper, remove it and feed JD-VCC from 5 V so the coil still gets its
+  rated voltage.
 - The virtual relay module is only a logic simulation. For the physical
   solenoid, use a separately rated supply, an appropriately rated relay or
   MOSFET driver, a fuse, and flyback suppression. Do not power a 12 V valve
@@ -171,7 +196,20 @@ sensor output.
 - Keep sensor/logic ground common at the controller. The physical relay's
   high-voltage or 12 V load wiring must remain isolated from the GPIO side.
 
-Compiles clean: 0 errors, 0 warnings in any PaaniGuard file, with
+**Re-verification pending.** The figures below were measured before the
+drift-confidence API, the valve latch, and the WiFi reconnect path were added.
+Those changes have not been compiled against the ESP8266 toolchain yet, because
+`arduino-cli` is not installed in the environment they were written in. Re-run
+the compile command above and update this paragraph with the real numbers
+before citing them.
+
+What *has* been verified since those changes: `host_sim` compiles the real
+`drift_compensation.cpp` and `fingerprinting.cpp` with `g++ -Wall -Wextra` at
+0 warnings, and its 7 assertions pass (see "Running without a board" below).
+That covers the drift and fingerprinting logic only — not `actuators.cpp`,
+`connectivity.cpp`, or the sketch itself.
+
+Previously measured: 0 errors, 0 warnings in any PaaniGuard file, with
 `--warnings all`. (The bundled ThingSpeak library itself emits 2 unused-
 parameter warnings from its own header — not this project's code — when
 `--warnings all` is used.) Flash size ~323KB/1MB (31%), IRAM ~61KB/65KB

@@ -26,6 +26,9 @@ struct FingerprintResult {
 // Evaluates the current (already drift/temp-corrected) readings against the
 // rule table and returns the matched fingerprint. Pure function — has no
 // side effects, does not touch actuators itself (see actuators.h for that).
-FingerprintResult fingerprint_evaluate(float ph, float correctedTdsPpm);
+// driftExceeded reports that the TDS sensor has drifted beyond the software-
+// correctable range; it only ever adds a reduced-confidence advisory when no
+// real deviation is present, and never downgrades a contamination result.
+FingerprintResult fingerprint_evaluate(float ph, float correctedTdsPpm, bool driftExceeded = false);
 
 #endif // PAANIGUARD_FINGERPRINTING_H

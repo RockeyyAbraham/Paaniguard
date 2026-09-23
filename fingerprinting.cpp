@@ -3,6 +3,9 @@
 // combinations to a pre-written alert. This is deliberately simple and
 // fully deterministic (no ML, no statistics beyond the fixed thresholds in
 // config.h) so the behavior is auditable and testable in SIMULATION_MODE.
+// One further deterministic rule sits alongside the table: a sensor-health
+// advisory raised only when the mask is clean, so it can never mask, downgrade
+// or suppress a contamination match or a shutoff.
 
 #include "fingerprinting.h"
 #include "config.h"
@@ -27,7 +30,7 @@ static uint8_t computeDeviationMask(float ph, float tds) {
   return mask;
 }
 
-FingerprintResult fingerprint_evaluate(float ph, float correctedTdsPpm) {
+FingerprintResult fingerprint_evaluate(float ph, float correctedTdsPpm, bool driftExceeded) {
   FingerprintResult result;
   result.authorityContact = LOCAL_AUTHORITY_CONTACT;
   result.triggerShutoff = false;
@@ -36,8 +39,19 @@ FingerprintResult fingerprint_evaluate(float ph, float correctedTdsPpm) {
 
   switch (mask) {
     case 0:
-      result.severity = Severity::NONE;
-      result.alertMessage = "Water quality within normal parameters.";
+      // No deviation in either channel. Only here is sensor health allowed to
+      // change the outcome — with no contamination match to compete with, the
+      // drift advisory cannot hide anything.
+      if (driftExceeded) {
+        result.severity = Severity::WATCH;
+        result.alertMessage =
+          "TDS sensor has drifted beyond the software-correctable range. The "
+          "current reading is reduced-confidence and should not be relied on. "
+          "Recalibrate the sensor against the reference solution.";
+      } else {
+        result.severity = Severity::NONE;
+        result.alertMessage = "Water quality within normal parameters.";
+      }
       break;
 
     case BIT_PH_MILD:

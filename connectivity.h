@@ -26,4 +26,11 @@ IPAddress connectivity_getIP();
 // once synced, and no-op entirely in SoftAP mode (no internet to get NTP from).
 void connectivity_maybeSyncTime();
 
+// Call every loop(). Non-blocking: at most one WiFi.begin() per
+// WIFI_RECONNECT_INTERVAL_MS, never waits for the result. Recovers a dropped
+// station link, and promotes a booted-into-SoftAP device to station once the
+// router comes back. The SoftAP is kept up on failed attempts so the local
+// status page stays reachable.
+void connectivity_maybeReconnect();
+
 #endif // PAANIGUARD_CONNECTIVITY_H

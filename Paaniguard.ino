@@ -37,6 +37,10 @@ void loop() {
   // Web server must stay responsive every loop iteration, independent of
   // the slower sensor-read cadence below.
   webserver_handleClient();
+  // Both of these are non-blocking and self-throttling. The reconnect in
+  // particular must never stall the loop: the sensor-read and actuation
+  // path below is safety-critical and cannot wait on WiFi.
+  connectivity_maybeReconnect();
   connectivity_maybeSyncTime();
 
   if (millis() - lastSensorReadMillis < SENSOR_READ_INTERVAL_MS) {
@@ -47,7 +51,11 @@ void loop() {
   SensorReadings r;
   sensors_read(r);
   float correctedTds = drift_getCorrectedTds(r.tds_raw_ppm, r.temperatureC);
-  FingerprintResult fingerprint = fingerprint_evaluate(r.ph_value, correctedTds);
+  // Sensor-health input to the rule table: once accumulated drift passes the
+  // software-correctable band, a clean-looking reading is reported as
+  // reduced-confidence rather than as a confident all-clear.
+  bool driftExceeded = drift_needsRecalibration();
+  FingerprintResult fingerprint = fingerprint_evaluate(r.ph_value, correctedTds, driftExceeded);
 
   // Offline-first safety response: identical whether connectivity_isOnline()
   // is true or false.

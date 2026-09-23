@@ -14,6 +14,13 @@
 //      linear trend to the drift, and applies a correction factor based on
 //      days since the last calibration. Checkpoints persist to flash so the
 //      trend survives a reboot.
+//
+// The confidence functions below (drift_getDriftPercent,
+// drift_needsRecalibration) report on mechanism 2 ONLY. They describe how
+// far the rolling-baseline trend has moved from the reference solution —
+// they say nothing about mechanism 1, which is a per-reading physics
+// correction with no accumulated state and therefore nothing to lose
+// confidence in. Do not conflate them.
 
 #ifndef PAANIGUARD_DRIFT_COMPENSATION_H
 #define PAANIGUARD_DRIFT_COMPENSATION_H
@@ -42,6 +49,19 @@ void drift_recordCheckpoint(float measuredPpm, int32_t dayIndexOverride = -1);
 // checkpoints from the last DRIFT_WINDOW_DAYS days). If fewer than 2
 // checkpoints are available, returns the input unchanged.
 float drift_applyBaselineCorrection(float tempCompensatedPpm);
+
+// Mechanism 2 confidence: magnitude of the currently predicted baseline
+// drift, as a percentage of TDS_REFERENCE_PPM. Absolute value — drift in
+// either direction is an equal loss of confidence. Returns 0.0 when fewer
+// than 2 checkpoints are available in the window: with insufficient data
+// the honest answer is "no drift claimed", not a guess.
+float drift_getDriftPercent();
+
+// True once drift_getDriftPercent() exceeds DRIFT_MAX_CORRECTABLE_PERCENT,
+// i.e. the sensor has aged past what the linear trend can still credibly
+// correct for and readings should be treated as reduced-confidence until
+// the probe is recalibrated.
+bool drift_needsRecalibration();
 
 // Convenience: runs both mechanisms in order (temp compensation, then
 // baseline correction). This is what the rest of the firmware should call.

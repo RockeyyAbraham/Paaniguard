@@ -49,7 +49,30 @@
 // -- 12V solenoid valve, via opto-isolated relay board
 // Plain digital output pin, no boot-time constraint. Opto-isolation on the
 // relay board protects the ESP8266 GPIO from the 12V valve side.
-#define PIN_RELAY_VALVE      13  // D7 / GPIO13 — HIGH = relay energized
+//
+// !! POLARITY IS UNVERIFIED AGAINST THE PHYSICAL BOARD !!
+// The code below assumes an ACTIVE-HIGH relay module (HIGH = coil energized).
+// The common 1-channel opto-isolated module is usually ACTIVE-LOW, which is
+// the opposite. If that is what we have, every digitalWrite on this pin is
+// inverted and "fail-safe closed" becomes fail-safe OPEN — the valve would
+// sit open on boot and on any reset.
+//
+// Measure it before the solenoid is plumbed (BUILD.md, BAG 6, Step 18): put a
+// meter on COM/NO, drive D7 both ways, and record which level closes the
+// contact. If the board is active-LOW, flip RELAY_LEVEL_VALVE_OPEN/CLOSED
+// below rather than editing actuators.cpp.
+#define PIN_RELAY_VALVE      13  // D7 / GPIO13 — see polarity note above
+
+// Relay drive levels, isolated here so a polarity flip is a one-line change.
+// Active-HIGH board (current assumption): OPEN=HIGH, CLOSED=LOW.
+// Active-LOW board: swap these two.
+#define RELAY_LEVEL_VALVE_OPEN    HIGH
+#define RELAY_LEVEL_VALVE_CLOSED  LOW
+
+// How many consecutive non-shutoff readings are required before a latched
+// contamination shutoff is released and the valve reopens. Prevents the valve
+// chattering when a reading sits right on a threshold.
+#define VALVE_REOPEN_CLEAN_READINGS  3
 
 // -- WS2812B addressable status LED (single pixel, bit-banged via
 // Adafruit_NeoPixel). GPIO2 requires HIGH at boot; the ESP8266's internal
@@ -96,6 +119,12 @@
 #define WIFI_PASSWORD        "PLACEHOLDER_PASSWORD"  // TODO: real network password
 #define WIFI_CONNECT_TIMEOUT_MS  15000  // how long to try station mode before SoftAP fallback
 
+// How often to retry the station connection after it has dropped, or after
+// booting into SoftAP fallback. Without this the mode chosen at boot is
+// permanent: a router reboot mid-deployment would end cloud logging for the
+// rest of the run. Retries are non-blocking.
+#define WIFI_RECONNECT_INTERVAL_MS  30000
+
 // SoftAP fallback (device becomes its own access point)
 #define SOFTAP_SSID          "PaaniGuard-Setup"
 #define SOFTAP_PASSWORD      "paaniguard123"  // TODO: consider requiring change on first boot
@@ -141,6 +170,13 @@
 // into the 342ppm reference) over a rolling window and fits a linear trend.
 #define DRIFT_WINDOW_DAYS         7
 #define DRIFT_MAX_CHECKPOINTS     14   // up to 2/day over the window
+
+// Beyond this much accumulated drift the software correction is no longer
+// trusted: the device raises a recalibration advisory and flags its readings
+// as reduced-confidence rather than silently reporting a corrected value.
+// This is the "drift-limit exceeded" signature in the design document, and
+// the live demonstration of the drift-compensation contribution.
+#define DRIFT_MAX_CORRECTABLE_PERCENT  15.0
 
 // ---------------------------------------------------------------------------
 // Flow sensor (YF-S201) — PLACEHOLDER. Datasheet-typical pulses-per-liter;

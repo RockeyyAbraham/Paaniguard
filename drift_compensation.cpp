@@ -117,7 +117,12 @@ void drift_recordCheckpoint(float measuredPpm, int32_t dayIndexOverride) {
   Serial.println(cp.measuredPpm);
 }
 
-float drift_applyBaselineCorrection(float tempCompensatedPpm) {
+// Shared by drift_applyBaselineCorrection() and drift_getDriftPercent():
+// both need the SAME rolling-baseline trend, so the fit lives in exactly
+// one place. Duplicating it would let the correction path and the
+// confidence path silently disagree the moment either is tweaked.
+// Returns false (and leaves *out untouched) when the trend can't be fitted.
+static bool computePredictedDrift(float *out) {
   uint32_t currentDay = drift_getCurrentDayIndex();
   uint32_t windowStart = (currentDay > DRIFT_WINDOW_DAYS) ? (currentDay - DRIFT_WINDOW_DAYS) : 0;
 
@@ -137,21 +142,45 @@ float drift_applyBaselineCorrection(float tempCompensatedPpm) {
   }
 
   if (n < 2) {
-    // Not enough calibration history yet to fit a trend — pass through.
-    return tempCompensatedPpm;
+    // Not enough calibration history yet to fit a trend.
+    return false;
   }
 
   double denom = (n * sumXX) - (sumX * sumX);
   if (fabs(denom) < 1e-9) {
-    // All checkpoints on the same day — can't fit a slope, pass through.
-    return tempCompensatedPpm;
+    // All checkpoints on the same day — can't fit a slope.
+    return false;
   }
 
   double slope = ((n * sumXY) - (sumX * sumY)) / denom;
   double intercept = (sumY - slope * sumX) / n;
-  double predictedDrift = slope * currentDay + intercept;
+  *out = (float)(slope * currentDay + intercept);
+  return true;
+}
 
-  return tempCompensatedPpm - (float)predictedDrift;
+float drift_applyBaselineCorrection(float tempCompensatedPpm) {
+  float predictedDrift;
+  if (!computePredictedDrift(&predictedDrift)) {
+    // No usable trend — pass the reading through unchanged.
+    return tempCompensatedPpm;
+  }
+  return tempCompensatedPpm - predictedDrift;
+}
+
+float drift_getDriftPercent() {
+  float predictedDrift;
+  if (!computePredictedDrift(&predictedDrift)) {
+    // Claiming a drift figure from one (or zero) checkpoints would be a
+    // guess dressed up as a measurement — report no drift instead.
+    return 0.0;
+  }
+  // Absolute value: reading high or low by the same amount is the same
+  // loss of confidence in the sensor.
+  return fabs(predictedDrift) / TDS_REFERENCE_PPM * 100.0;
+}
+
+bool drift_needsRecalibration() {
+  return drift_getDriftPercent() > DRIFT_MAX_CORRECTABLE_PERCENT;
 }
 
 float drift_getCorrectedTds(float rawTdsPpm, float temperatureC) {
