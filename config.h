@@ -11,7 +11,7 @@
 // Set to 1 to run entirely on synthetic sensor data (no hardware required).
 // Set to 0 once real sensors are wired and calibrated.
 // ---------------------------------------------------------------------------
-#define SIMULATION_MODE 1
+#define SIMULATION_MODE 0
 
 // ---------------------------------------------------------------------------
 // PIN MAP (ESP8266 NodeMCU v2 / esp8266:esp8266:nodemcuv2)
@@ -103,8 +103,9 @@
 // resolution — not enough precision or channel count for pH + TDS.
 // ---------------------------------------------------------------------------
 #define ADS1115_I2C_ADDRESS  0x48  // default address (ADDR pin tied to GND)
-#define ADS1115_CHANNEL_PH   0     // A0 on the ADS1115 — pH probe
-#define ADS1115_CHANNEL_TDS  1     // A1 on the ADS1115 — TDS module
+// pH sensor removed from project scope - A0 repurposed for TDS.
+// ADS1115 A1 pin found physically damaged on bench - do not use.
+#define ADS1115_CHANNEL_TDS  0     // A0 on the ADS1115 - TDS module (remapped; A1 damaged)
 // A2, A3 on the ADS1115 are spare for future sensors.
 
 // SSD1306 OLED
@@ -117,7 +118,7 @@
 // ---------------------------------------------------------------------------
 #define WIFI_SSID            "PLACEHOLDER_SSID"      // TODO: real network SSID
 #define WIFI_PASSWORD        "PLACEHOLDER_PASSWORD"  // TODO: real network password
-#define WIFI_CONNECT_TIMEOUT_MS  15000  // how long to try station mode before SoftAP fallback
+#define WIFI_CONNECT_TIMEOUT_MS  1000  // fast fallback for bench testing
 
 // How often to retry the station connection after it has dropped, or after
 // booting into SoftAP fallback. Without this the mode chosen at boot is
@@ -211,7 +212,7 @@
 // ---------------------------------------------------------------------------
 // Main loop timing
 // ---------------------------------------------------------------------------
-#define SENSOR_READ_INTERVAL_MS   5000
+#define SENSOR_READ_INTERVAL_MS   1000
 #define DISPLAY_REFRESH_INTERVAL_MS  2000
 
 #endif // PAANIGUARD_CONFIG_H

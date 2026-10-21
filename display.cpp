@@ -8,15 +8,20 @@ static Adafruit_SSD1306 oled(OLED_WIDTH, OLED_HEIGHT, &Wire, -1);
 static bool oledAvailable = false;
 
 bool display_init() {
+  Serial.println(F("display_init: starting..."));
   oledAvailable = oled.begin(SSD1306_SWITCHCAPVCC, OLED_I2C_ADDRESS);
   if (!oledAvailable) {
-    Serial.println(F("display: SSD1306 not found at OLED_I2C_ADDRESS — skipping OLED output."));
+    Serial.println(F("display: SSD1306 not found at OLED_I2C_ADDRESS"));
     return false;
   }
+  Serial.println(F("display_init: SSD1306 found, rendering welcome..."));
   oled.clearDisplay();
   oled.setTextColor(SSD1306_WHITE);
   oled.setTextSize(1);
+  oled.setCursor(15, 25);
+  oled.print(F("PaaniGuard Ready"));
   oled.display();
+  Serial.println(F("display_init: complete."));
   return true;
 }
 
@@ -35,31 +40,45 @@ void display_render(const SensorReadings &readings, float correctedTdsPpm,
   if (!oledAvailable) return;
 
   oled.clearDisplay();
+  oled.setTextColor(SSD1306_WHITE);
+
+  // Top Header Banner
+  oled.setTextSize(1);
   oled.setCursor(0, 0);
+  oled.print(F("== PAANIGUARD =="));
 
-  oled.print(F("pH: "));
-  oled.println(readings.ph_value, 2);
+  // Status line
+  oled.setCursor(0, 12);
+  if (fingerprint.severity == Severity::SEVERE || fingerprint.severity == Severity::WARNING) {
+    oled.print(F("Status: ! HIGH TDS !"));
+  } else if (readings.tds_voltage_mV < 50.0) {
+    oled.print(F("Status: PROBE IN AIR"));
+  } else {
+    oled.print(F("Status: SAFE / CLEAN"));
+  }
 
-  oled.print(F("TDS: "));
-  oled.print(correctedTdsPpm, 0);
-  oled.println(F(" ppm"));
+  // Big TDS Number
+  oled.setCursor(0, 24);
+  oled.setTextSize(2);
+  oled.print((int)correctedTdsPpm);
+  oled.setTextSize(1);
+  oled.print(F(" ppm"));
 
+  // Voltage row
+  oled.setCursor(0, 44);
+  oled.setTextSize(1);
+  oled.print(F("Voltage: "));
+  oled.print(readings.tds_voltage_mV / 1000.0, 3);
+  oled.print(F(" V"));
+
+  // Temperature row
+  oled.setCursor(0, 55);
   oled.print(F("Temp: "));
-  oled.print(readings.temperatureC, 1);
-  oled.println(F(" C"));
-
-  oled.print(F("Flow: "));
-  oled.print(readings.flowRateLPM, 1);
-  oled.println(F(" L/min"));
-
-  oled.print(F("Status: "));
-  oled.println(severityLabel(fingerprint.severity));
-
-  if (fingerprint.severity != Severity::NONE) {
-    // Word-wrapped by Adafruit_GFX's println at this text size only up to
-    // the display width — long alert strings are intentionally truncated
-    // here since the full text is always available over Serial/webserver.
-    oled.println(fingerprint.alertMessage);
+  if (readings.temperatureC <= -55.0 || readings.temperatureC >= 125.0) {
+    oled.print(F("-- C"));
+  } else {
+    oled.print(readings.temperatureC, 1);
+    oled.print(F(" C"));
   }
 
   oled.display();

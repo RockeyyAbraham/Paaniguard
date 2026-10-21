@@ -49,20 +49,28 @@ void actuators_setStatusColor(uint8_t r, uint8_t g, uint8_t b) {
 void actuators_applyFingerprint(const FingerprintResult &result) {
   switch (result.severity) {
     case Severity::NONE:
-      actuators_setStatusColor(0, 40, 0);   // dim green — all clear
+      actuators_setStatusColor(0, 255, 0);   // bright green
       actuators_setBuzzer(false);
       break;
     case Severity::WATCH:
-      actuators_setStatusColor(0, 40, 60);  // dim cyan — minor deviation
+      actuators_setStatusColor(0, 255, 0);   // green
       actuators_setBuzzer(false);
       break;
     case Severity::WARNING:
-      actuators_setStatusColor(80, 40, 0);  // amber — notable deviation
-      actuators_setBuzzer(false);
+      actuators_setStatusColor(255, 0, 0);   // red
+      digitalWrite(PIN_BUZZER, HIGH);
+      delay(80);
+      digitalWrite(PIN_BUZZER, LOW);
       break;
     case Severity::SEVERE:
-      actuators_setStatusColor(120, 0, 0);  // red — contamination fingerprint matched
-      actuators_setBuzzer(true);
+      actuators_setStatusColor(255, 0, 0);   // red alert
+      digitalWrite(PIN_BUZZER, HIGH);
+      delay(80);
+      digitalWrite(PIN_BUZZER, LOW);
+      delay(50);
+      digitalWrite(PIN_BUZZER, HIGH);
+      delay(80);
+      digitalWrite(PIN_BUZZER, LOW);
       break;
   }
 

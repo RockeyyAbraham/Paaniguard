@@ -46,9 +46,11 @@ void sensors_init() {
   simulation_init();
 #else
   ads.begin(ADS1115_I2C_ADDRESS);
+  ads.setGain(GAIN_ONE);
   dallas.begin();
-  pinMode(PIN_FLOW_SENSOR, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(PIN_FLOW_SENSOR), sensors_flowISR, FALLING);
+  dallas.setWaitForConversion(false);
+  // pinMode(PIN_FLOW_SENSOR, INPUT_PULLUP);
+  // attachInterrupt(digitalPinToInterrupt(PIN_FLOW_SENSOR), sensors_flowISR, FALLING);
 #endif
   lastFlowCalcMillis = millis();
 }
@@ -88,26 +90,28 @@ void sensors_read(SensorReadings &out) {
   out.flowRateLPM = sim.flowRateLPM;
   totalLitersAccum += sim.litersThisTick;
 #else
-  int16_t phRaw = ads.readADC_SingleEnded(ADS1115_CHANNEL_PH);
-  out.ph_voltage_mV = ads.computeVolts(phRaw) * 1000.0;
-
   int16_t tdsRaw = ads.readADC_SingleEnded(ADS1115_CHANNEL_TDS);
   out.tds_voltage_mV = ads.computeVolts(tdsRaw) * 1000.0;
+  out.ph_voltage_mV = 2500.0;
 
-  dallas.requestTemperatures();
-  out.temperatureC = dallas.getTempCByIndex(0);
+  if (dallas.getDeviceCount() > 0) {
+    dallas.requestTemperatures();
+    float tc = dallas.getTempCByIndex(0);
+    out.temperatureC = (tc < -55.0 || tc > 125.0) ? 25.0 : tc;
+  } else {
+    out.temperatureC = 25.0; // Default room temp reference when unattached
+  }
 
   out.flowRateLPM = computeFlowRateLPM();
 #endif
 
-  // pH: linear fit between the two buffer-solution calibration points
-  // (see config.h — PLACEHOLDER until bench-calibrated with pH 4.0/7.0).
-  out.ph_value = PH_CALIBRATION_SLOPE * (out.ph_voltage_mV / 1000.0) + PH_CALIBRATION_OFFSET;
+  // pH sensor omitted from hardware: use neutral safe value (7.0) to prevent false alerts
+  out.ph_value = 7.0;
 
-  // TDS: cubic voltage->ppm fit (see config.h — PLACEHOLDER until
-  // bench-calibrated against the 342ppm reference solution).
+  // TDS standard curve
   float v = out.tds_voltage_mV / 1000.0;
-  out.tds_raw_ppm = (TDS_CAL_COEFF_A * v * v * v) - (TDS_CAL_COEFF_B * v * v) + (TDS_CAL_COEFF_C * v);
+  out.tds_raw_ppm = (133.42 * pow(v, 3) - 255.86 * pow(v, 2) + 857.39 * v) * 0.5;
+  if (out.tds_raw_ppm < 0) out.tds_raw_ppm = 0;
 
   out.totalLiters = totalLitersAccum;
 }
