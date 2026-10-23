@@ -46,6 +46,20 @@ void connectivity_init() {
   lastReconnectAttemptMs = millis();
 }
 
+void connectivity_startSoftAP() {
+  WiFi.persistent(false);   // don't write WiFi settings to flash on every boot
+  WiFi.mode(WIFI_AP);
+  IPAddress ip;
+  ip.fromString(SOFTAP_LOCAL_IP);
+  WiFi.softAPConfig(ip, ip, IPAddress(255, 255, 255, 0));
+  WiFi.softAP(SOFTAP_SSID, SOFTAP_PASSWORD, 6, false, 4);
+  currentMode = ConnectivityMode::SOFTAP;
+  Serial.print(F("connectivity: SoftAP only, network \""));
+  Serial.print(SOFTAP_SSID);
+  Serial.print(F("\", IP="));
+  Serial.println(WiFi.softAPIP());
+}
+
 void connectivity_maybeReconnect() {
   // Happy path first, and unthrottled: a healthy station costs one status read.
   if (currentMode == ConnectivityMode::STATION && WiFi.status() == WL_CONNECTED) {
