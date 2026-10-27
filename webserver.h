@@ -25,6 +25,11 @@ void webserver_setDemo(bool on);
 // hour). The demo build shortens it so the chart fills in a few minutes.
 void webserver_setHistoryInterval(unsigned long ms);
 
+// The current TDS reading as it should be recorded if the user taps "record
+// checkpoint": temperature-compensated but NOT baseline-corrected, and
+// smoothed. valid=false when the probe is not responding.
+void webserver_setCalibrationInput(float tempCompensatedPpm, bool valid);
+
 // What the page should say about each sensor. tdsOk: the ADC answered.
 // flowSeen: at least one flow pulse has ever been counted (a hall sensor
 // can't be detected any other way). tempOk: a real temperature probe is

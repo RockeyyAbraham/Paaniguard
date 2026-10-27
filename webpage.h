@@ -126,6 +126,10 @@ dt,dd{margin:0;padding:.6rem 0;border-bottom:1px solid var(--line)}
 dt{color:var(--muted)}
 dd{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
 dd .mono{font-family:var(--mono);font-weight:500;font-size:.9em}
+.help{margin:.75rem 0 0;color:var(--muted);font-size:.9rem;max-width:34rem}
+.btn{margin-top:.9rem;min-height:2.75rem;padding:.5rem 1.2rem;font:700 .95rem var(--font);color:var(--bg);background:var(--ink);border:0;border-radius:.75rem;cursor:pointer}
+.btn:disabled{opacity:.5;cursor:default}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .tag{display:inline-block;padding:.2rem .7rem;border-radius:1rem;font-size:.8rem;font-weight:700;border:1px solid var(--line);color:var(--muted)}
 .tag.good{color:var(--ok);border-color:currentColor}
 .tag.bad{color:var(--alert);border-color:currentColor}
@@ -211,6 +215,18 @@ body.lost .banner{display:block}
             <dt>TDS calibration</dt><dd id="sCal">—</dd>
           </dl>
         </section>
+
+        <section>
+          <h2>TDS calibration</h2>
+          <dl>
+            <dt>Status</dt><dd id="cStatus">—</dd>
+            <dt>Checkpoints saved</dt><dd id="cN">—</dd>
+            <dt>Estimated drift</dt><dd id="cPct">—</dd>
+          </dl>
+          <p class="help" id="cHelp"></p>
+          <button type="button" class="btn" id="cBtn">Record checkpoint</button>
+          <p class="help" id="cMsg" role="status"></p>
+        </section>
       </div>
 
       <div class="col">
@@ -253,7 +269,7 @@ body.lost .banner{display:block}
 var $=function(id){return document.getElementById(id)};
 var DEMO=location.protocol==="file:"||/[?&]demo/.test(location.search);
 var PIN=(location.search.match(/demo=(\d)/)||[])[1];
-var lastOk=0,fails=0,lastHist=0,hist=null,S=null;
+var lastOk=0,fails=0,lastHist=0,hist=null,S=null,timeSent=false;
 
 var ICONS=[
  '<path d="M12 3c3 4 6 7 6 11a6 6 0 0 1-12 0c0-4 3-7 6-11z"/><path d="M9.5 14.5l2 2 3.5-4"/>',
@@ -311,7 +327,16 @@ function render(d){
   tag($("sFlow"),d.flow.seen?"Pulses detected":"No pulses yet",d.flow.seen?"good":"warn");
   tag($("sTemp"),d.temp.ok?"Responding":"Not fitted");
   tag($("sPh"),"Not fitted");
-  tag($("sCal"),d.tds.calibrated?"Calibrated":"Not calibrated",d.tds.calibrated?"good":"warn");
+  var dr=d.drift||{n:0,active:false,pct:0,recal:false,ref:342,limit:15};
+  var calTxt=dr.recal?"Recalibrate":dr.active?"Correcting drift":"Not calibrated",calCls=dr.recal?"bad":dr.active?"good":"warn";
+  tag($("sCal"),calTxt,calCls);
+  tag($("cStatus"),calTxt,calCls);
+  $("cN").textContent=dr.n;
+  $("cPct").textContent=dr.active?fmt(dr.pct,1)+" % (limit "+dr.limit+" %)":"—";
+  $("cHelp").textContent=dr.recal?
+    "Drift is past the "+dr.limit+" % the software can correct, so readings are less reliable. Clean or replace the probe, then record fresh checkpoints.":
+    dr.active?"Record a checkpoint every day or two to keep the correction accurate. Put the probe in the "+dr.ref+" ppm reference solution first.":
+    "To correct sensor aging, put the probe in the "+dr.ref+" ppm reference solution, wait until the reading settles, then record a checkpoint. Two checkpoints on different days start the correction.";
 
   $("rTds").textContent=ppm==null?"—":fmt(ppm,1)+" ppm";
   $("rMv").textContent=d.tds.ok?fmt(d.tds.mv,0)+" mV":"—";
@@ -358,7 +383,9 @@ function setLink(state,txt){var l=$("link");l.setAttribute("data-state",state);$
 function tick(){
   if(DEMO)return demoTick();
   fetch("/api/status",{cache:"no-store"}).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){
-    fails=0;lastOk=Date.now();render(d);d.demo?setLink("demo","Simulated data"):setLink("live","Live");
+    fails=0;lastOk=Date.now();render(d);
+    /* The board has no clock or internet: give it the phone's date once per page load (drift trend needs real days). */
+    if(!timeSent){timeSent=true;post("/api/time",String(Math.floor(Date.now()/1000))).catch(function(){})}d.demo?setLink("demo","Simulated data"):setLink("live","Live");
     if(!hist||Date.now()-lastHist>30000){lastHist=Date.now();
       fetch("/api/history",{cache:"no-store"}).then(function(r){return r.json()}).then(function(h){hist=h;drawChart(h)}).catch(function(){});}
   }).catch(function(){fails++;if(fails>=3)setLink("lost","Disconnected");else setLink("stale","Reconnecting…")});
@@ -378,11 +405,27 @@ function demoTick(){
     flow:{lpm:lv===3?0:2.4+Math.sin(secs/3),total:184.6+secs/20,pulses:Math.floor(83000+secs*18),ok:true,seen:true},
     temp:{c:25+2.5*Math.sin(secs/9),ok:true},ph:{ok:false},
     net:{ssid:"PaaniGuard",ip:"192.168.4.1",clients:2},sys:{heap:31200},
+    drift:{n:3,active:true,pct:lv===3?16.5:4.2,recal:lv===3,ref:342,limit:15},
     contact:"Contact your local water authority / municipal helpline"});
   setLink("demo","Demo data");
   if(!hist){var a=[];for(var i=0;i<120;i++)a.push(i<8?null:Math.round(150+Math.sin(i/9)*30+i*(lv>0?4:0)));hist={interval:30,ppm:a};drawChart(hist)}
   $("rAge").textContent="demo";
 }
+
+function post(url,body){return fetch(url,{method:"POST",body:body||""})}
+function calMsg(t){$("cMsg").textContent=t}
+$("cBtn").onclick=function(){
+  if(DEMO){calMsg("Not available with demo data.");return}
+  var ref=S&&S.drift?S.drift.ref:342;
+  if(!confirm("Is the probe in the "+ref+" ppm reference solution, with the reading settled? A wrong checkpoint skews every later reading."))return;
+  var b=$("cBtn");b.disabled=true;calMsg("Recording…");
+  post("/api/time",String(Math.floor(Date.now()/1000))).catch(function(){})
+    .then(function(){return post("/api/calibrate")})
+    .then(function(r){return r.json().catch(function(){return {ok:false,error:"Not available here (USB bridge)."}})})
+    .then(function(j){calMsg(j.ok?"Checkpoint recorded at "+fmt(j.measured,0)+" ppm ("+j.n+" saved).":j.error)})
+    .catch(function(){calMsg("Could not reach the device.")})
+    .then(function(){b.disabled=false;tick()});
+};
 
 function setView(v){
   document.body.setAttribute("data-view",v);

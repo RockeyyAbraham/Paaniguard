@@ -7,6 +7,7 @@
 #include "connectivity.h"
 #include "webserver.h"
 #include "fingerprinting.h"
+#include "drift_compensation.h"
 
 Adafruit_SSD1306 display(128, 64, &Wire, -1);
 Adafruit_ADS1115 ads;
@@ -213,6 +214,7 @@ void setup() {
   }
 
   // Own WiFi network + status page. A phone that joins is sent to the page.
+  drift_init();   // mounts LittleFS, loads saved calibration checkpoints
   connectivity_startSoftAP();
   webserver_init();
 #if DEMO_SENSOR_DATA
@@ -223,6 +225,14 @@ void setup() {
 }
 
 void loop() {
+  // Serial 'x' forgets all calibration checkpoints (e.g. after changing the probe).
+  while (Serial.available()) {
+    if (Serial.read() == 'x') {
+      drift_clearCheckpoints();
+      Serial.println(F("drift: calibration checkpoints cleared"));
+    }
+  }
+
   float tdsV = 0.0;
   float tdsPpm = 0.0;
   float tempC = 25.0;      // water temperature; stays 25 until a probe is fitted
@@ -257,11 +267,38 @@ void loop() {
   }
 #endif
 
+  // Two separate corrections (see drift_compensation.h), applied in this order:
+  //  1. Temperature compensation: normalize to 25 C. Skipped while no
+  //     temperature reading exists, so the value stays raw instead of being
+  //     "corrected" with a made-up temperature.
+  //  2. Drift correction: removes the sensor-aging offset fitted from the
+  //     calibration checkpoints. A pass-through until 2+ checkpoints exist.
+  // From here on tdsPpm is the corrected value the verdict, OLED, serial and
+  // page use.
+  float rawTdsPpm = tdsPpm;
+  if (tempOk) tdsPpm = drift_applyTemperatureCompensation(rawTdsPpm, tempC);
+  float tdsTempComp = tdsPpm;   // what a calibration checkpoint must record
+  if (tdsReady) {
+    tdsPpm = drift_applyBaselineCorrection(tdsTempComp);
+    if (tdsPpm < 0) tdsPpm = 0;
+  }
+
+  // Smoothed copy for the page's "record checkpoint" button (about 4 s average).
+  static float calEma = 0.0;
+  static bool calEmaInit = false;
+  if (tdsReady) {
+    calEma = calEmaInit ? (0.9f * calEma + 0.1f * tdsTempComp) : tdsTempComp;
+    calEmaInit = true;
+  } else {
+    calEmaInit = false;
+  }
+  webserver_setCalibrationInput(calEma, tdsReady);
+
   bool isHighTds = (tdsPpm >= 500.0);
 
   // One verdict drives the beeper, LED, OLED and the web page, so they always agree.
   // level: 0 normal, 1 watch, 2 check your water, 3 do not use.
-  FingerprintResult fp = fingerprint_evaluate(7.0, tdsPpm);
+  FingerprintResult fp = fingerprint_evaluate(7.0, tdsPpm, drift_needsRecalibration());
   int level = (int)fp.severity;
 
   // Compute flow rate every 500ms
@@ -308,13 +345,14 @@ void loop() {
   // Web page / API: share the same readings the OLED and serial just used.
   SensorReadings r = {};
   r.tds_voltage_mV = tdsV * 1000.0;
-  r.tds_raw_ppm = tdsPpm;
+  r.tds_raw_ppm = rawTdsPpm;
   r.ph_value = 7.0;        // pH probe removed from scope, neutral value (as in sensors.cpp)
   r.temperatureC = tempC;
   r.flowRateLPM = flowRateLPM;
   r.totalLiters = flowPulses / FLOW_PULSES_PER_LITER;
   r.timestamp = millis();
-  webserver_setSensorStatus(tdsReady, flowPulses > 0, tempOk, false);
+  webserver_setSensorStatus(tdsReady, flowPulses > 0, tempOk,
+                            drift_hasTrend() && !drift_needsRecalibration());
   webserver_updateStatus(r, tdsPpm, fp, flowPulses);
 
   // Keep serving web requests for the rest of the loop period.

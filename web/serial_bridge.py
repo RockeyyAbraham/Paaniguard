@@ -131,6 +131,7 @@ def status():
         "ph": {"ok": False},
         "net": {"ssid": "USB cable", "ip": "localhost:%d" % args.http, "clients": 0},
         "sys": {"heap": None},
+        "drift": {"n": 0, "active": False, "pct": 0.0, "recal": False, "ref": 342, "limit": 15},
         "contact": CONTACT,
     }
 

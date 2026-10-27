@@ -1,6 +1,7 @@
 #include "webserver.h"
 #include "config.h"
 #include "webpage.h"
+#include "drift_compensation.h"
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <DNSServer.h>
@@ -15,6 +16,17 @@ static FingerprintResult lastFingerprint = {
   Severity::NONE, "No readings yet.", LOCAL_AUTHORITY_CONTACT, false
 };
 static bool tdsOk = false, flowSeen = false, tempOk = false, tdsCalibrated = false;
+
+// Calibration. The board is AP-only, so it never gets NTP time and the drift
+// trend would have no real calendar. The page sends the phone's clock instead
+// (POST /api/time); checkpoints are refused until that has happened this boot.
+static float calInputPpm = 0.0;
+static bool calInputValid = false;
+static bool timeSynced = false;
+static unsigned long lastTimeSyncMs = 0;
+static unsigned long lastCheckpointMs = 0;
+static const unsigned long TIME_RESYNC_MS = 6UL * 3600UL * 1000UL;  // limits flash writes
+static const unsigned long CHECKPOINT_MIN_GAP_MS = 10UL * 60UL * 1000UL;
 
 // One hour of TDS history at one sample every 30 s. 0xFFFF marks "no data"
 // (probe missing at that moment, or the device had not been running yet).
@@ -54,7 +66,7 @@ static void handleStatus() {
   jsonStr(msg, sizeof msg, lastFingerprint.alertMessage);
   jsonStr(contact, sizeof contact, lastFingerprint.authorityContact);
 
-  char buf[900];
+  char buf[1100];
   snprintf(buf, sizeof buf,
     "{\"uptime\":%lu,\"demo\":%s,"
     "\"verdict\":{\"level\":%d,\"message\":%s},"
@@ -63,6 +75,7 @@ static void handleStatus() {
     "\"temp\":{\"c\":%.1f,\"ok\":%s},\"ph\":{\"ok\":false},"
     "\"net\":{\"ssid\":\"%s\",\"ip\":\"%s\",\"clients\":%d},"
     "\"sys\":{\"heap\":%u},"
+    "\"drift\":{\"n\":%u,\"active\":%s,\"pct\":%.1f,\"recal\":%s,\"ref\":%d,\"limit\":%d},"
     "\"contact\":%s}",
     millis() / 1000UL, demoData ? "true" : "false",
     (int)lastFingerprint.severity, msg,
@@ -72,6 +85,9 @@ static void handleStatus() {
     lastReadings.temperatureC, tempOk ? "true" : "false",
     SOFTAP_SSID, WiFi.softAPIP().toString().c_str(), (int)WiFi.softAPgetStationNum(),
     (unsigned)ESP.getFreeHeap(),
+    (unsigned)drift_getCheckpointCount(), drift_hasTrend() ? "true" : "false",
+    drift_getDriftPercent(), drift_needsRecalibration() ? "true" : "false",
+    (int)TDS_REFERENCE_PPM, (int)DRIFT_MAX_CORRECTABLE_PERCENT,
     contact);
   server.sendHeader(F("Cache-Control"), F("no-store"));
   server.send(200, "application/json", buf);
@@ -89,6 +105,50 @@ static void handleHistory() {
   snprintf(buf + n, sizeof buf - n, "]}");
   server.sendHeader(F("Cache-Control"), F("no-store"));
   server.send(200, "application/json", buf);
+}
+
+// POST /api/time, body = the phone's Unix time in seconds.
+static void handleTime() {
+  unsigned long t = strtoul(server.arg("plain").c_str(), nullptr, 10);
+  bool sane = t > 1700000000UL && t < 4102444800UL;       // after Nov 2023, before 2100
+  if (sane && (!timeSynced || millis() - lastTimeSyncMs > TIME_RESYNC_MS)) {
+    drift_syncDayIndexFromEpoch((time_t)t);                // writes flash, hence the limit
+    timeSynced = true;
+    lastTimeSyncMs = millis();
+  }
+  server.send(200, "application/json", sane ? "{\"ok\":true}" : "{\"ok\":false}");
+}
+
+// POST /api/calibrate: records a drift checkpoint from the current reading.
+// Every refusal exists to stop a bad checkpoint from silently skewing every
+// future reading, so they are strict.
+static void sendCalError(int code, const char *msg) {
+  char buf[200];
+  snprintf(buf, sizeof buf, "{\"ok\":false,\"error\":\"%s\"}", msg);
+  server.send(code, "application/json", buf);
+}
+
+static void handleCalibrate() {
+  const float ref = TDS_REFERENCE_PPM;
+  if (!timeSynced) {
+    sendCalError(409, "The device does not know today's date yet. Reload the page and try again.");
+  } else if (!calInputValid) {
+    sendCalError(409, "The TDS sensor is not responding.");
+  } else if (calInputPpm < ref * 0.5f || calInputPpm > ref * 1.5f) {
+    char m[160];
+    snprintf(m, sizeof m, "Reading is %d ppm, not close to the %d ppm reference. Put the probe in the reference solution and wait for the reading to settle.",
+             (int)calInputPpm, (int)ref);
+    sendCalError(422, m);
+  } else if (lastCheckpointMs && millis() - lastCheckpointMs < CHECKPOINT_MIN_GAP_MS) {
+    sendCalError(429, "A checkpoint was just recorded. Wait 10 minutes before recording another.");
+  } else {
+    drift_recordCheckpoint(calInputPpm);
+    lastCheckpointMs = millis();
+    char buf[120];
+    snprintf(buf, sizeof buf, "{\"ok\":true,\"measured\":%.1f,\"n\":%u}", calInputPpm,
+             (unsigned)drift_getCheckpointCount());
+    server.send(200, "application/json", buf);
+  }
 }
 
 // Captive portal: phones probe a known URL (/generate_204 on Android,
@@ -110,6 +170,8 @@ void webserver_init() {
   server.on("/", handleRoot);
   server.on("/api/status", handleStatus);
   server.on("/api/history", handleHistory);
+  server.on("/api/time", HTTP_POST, handleTime);
+  server.on("/api/calibrate", HTTP_POST, handleCalibrate);
   server.onNotFound(handleRedirect);
   server.begin();
   Serial.println(F("webserver: status page + API + captive portal on 192.168.4.1"));
@@ -126,6 +188,11 @@ void webserver_setDemo(bool on) {
 
 void webserver_setHistoryInterval(unsigned long ms) {
   histIntervalMs = ms < 1000 ? 1000 : ms;
+}
+
+void webserver_setCalibrationInput(float tempCompensatedPpm, bool valid) {
+  calInputPpm = tempCompensatedPpm;
+  calInputValid = valid;
 }
 
 void webserver_setSensorStatus(bool tdsOkNow, bool flowSeenNow, bool tempOkNow, bool tdsCalibratedNow) {

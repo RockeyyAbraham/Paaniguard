@@ -183,6 +183,21 @@ bool drift_needsRecalibration() {
   return drift_getDriftPercent() > DRIFT_MAX_CORRECTABLE_PERCENT;
 }
 
+uint8_t drift_getCheckpointCount() {
+  return state.checkpointCount;
+}
+
+bool drift_hasTrend() {
+  float unused;
+  return computePredictedDrift(&unused);
+}
+
+void drift_clearCheckpoints() {
+  state.checkpointCount = 0;
+  memset(state.checkpoints, 0, sizeof(state.checkpoints));
+  saveState();
+}
+
 float drift_getCorrectedTds(float rawTdsPpm, float temperatureC) {
   float tempCompensated = drift_applyTemperatureCompensation(rawTdsPpm, temperatureC);
   return drift_applyBaselineCorrection(tempCompensated);
