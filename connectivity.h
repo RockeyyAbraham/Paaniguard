@@ -13,6 +13,13 @@
 enum class ConnectivityMode { STATION, SOFTAP };
 
 void connectivity_init();
+
+// SoftAP only: skips station mode entirely and brings up the device's own
+// network (SOFTAP_SSID / SOFTAP_PASSWORD at 192.168.4.1, up to 4 phones).
+// For installs with no router, e.g. a tank. Use this instead of
+// connectivity_init(), not alongside it.
+void connectivity_startSoftAP();
+
 ConnectivityMode connectivity_getMode();
 
 // True only when in station mode AND actually associated — this is the

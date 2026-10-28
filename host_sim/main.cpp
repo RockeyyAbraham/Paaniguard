@@ -49,6 +49,8 @@ static void check(const char *claim, bool condition) {
 
 int main() {
   drift_init();
+  check("fresh state: 0 checkpoints and no usable trend",
+        drift_getCheckpointCount() == 0 && !drift_hasTrend());
 
   std::printf("=== Scenario 1: normal/clean water sample ===\n");
   runReading("clean@25C", 310.0f, 25.0f, 7.0f);
@@ -61,6 +63,8 @@ int main() {
   drift_recordCheckpoint(351.0f, (int32_t)today - 4);
   drift_recordCheckpoint(358.0f, (int32_t)today - 2);
   drift_recordCheckpoint(364.0f, (int32_t)today);
+  check("4 checkpoints on different days give a usable trend",
+        drift_getCheckpointCount() == 4 && drift_hasTrend());
   runReading("post-drift-fit", 310.0f, 25.0f, 7.0f); // same raw input as scenario 1 — baseline correction should now pull it down
 
   std::printf("\n=== Scenario 3: contamination pattern A (pH drop + TDS spike) ===\n");
@@ -111,6 +115,13 @@ int main() {
     check("drift flag does not alter the contamination verdict",
           fp.severity == without.severity && fp.triggerShutoff == without.triggerShutoff);
   }
+
+  std::printf("\n=== Scenario 7: clearing checkpoints (probe replaced) ===\n");
+  drift_clearCheckpoints();
+  check("after clear: 0 checkpoints, no trend, correction is a pass-through",
+        drift_getCheckpointCount() == 0 && !drift_hasTrend() &&
+        drift_applyBaselineCorrection(310.0f) == 310.0f);
+  check("after clear: no recalibration advisory", !drift_needsRecalibration());
 
   std::printf("\n=== %s: %d check(s) failed ===\n", failures == 0 ? "ALL CHECKS PASSED" : "FAILURES", failures);
   return failures == 0 ? 0 : 1;

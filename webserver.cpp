@@ -1,70 +1,218 @@
 #include "webserver.h"
 #include "config.h"
+#include "webpage.h"
+#include "drift_compensation.h"
+#include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
+#include <DNSServer.h>
 
 static ESP8266WebServer server(80);
+static DNSServer dns;
 
 static SensorReadings lastReadings = {};
 static float lastCorrectedTdsPpm = 0.0;
+static unsigned long lastFlowPulses = 0;
 static FingerprintResult lastFingerprint = {
   Severity::NONE, "No readings yet.", LOCAL_AUTHORITY_CONTACT, false
 };
+static bool tdsOk = false, flowSeen = false, tempOk = false, tdsCalibrated = false;
 
-static const char *severityLabel(Severity s) {
-  switch (s) {
-    case Severity::NONE:    return "OK";
-    case Severity::WATCH:   return "WATCH";
-    case Severity::WARNING: return "WARNING";
-    case Severity::SEVERE:  return "ALERT";
+// Calibration. The board is AP-only, so it never gets NTP time and the drift
+// trend would have no real calendar. The page sends the phone's clock instead
+// (POST /api/time); checkpoints are refused until that has happened this boot.
+static float calInputPpm = 0.0;
+static bool calInputValid = false;
+static bool timeSynced = false;
+static unsigned long lastTimeSyncMs = 0;
+static unsigned long lastCheckpointMs = 0;
+static const unsigned long TIME_RESYNC_MS = 6UL * 3600UL * 1000UL;  // limits flash writes
+static const unsigned long CHECKPOINT_MIN_GAP_MS = 10UL * 60UL * 1000UL;
+
+// One hour of TDS history at one sample every 30 s. 0xFFFF marks "no data"
+// (probe missing at that moment, or the device had not been running yet).
+static const uint16_t HIST_NONE = 0xFFFF;
+static const uint8_t  HIST_LEN = 120;
+static unsigned long histIntervalMs = 30000;   // see webserver_setHistoryInterval()
+static bool demoData = false;
+static uint16_t hist[HIST_LEN];
+static uint8_t histHead = 0;      // next slot to write
+static unsigned long lastHistMs = 0;
+static bool histStarted = false;
+
+static const IPAddress PORTAL_IP(192, 168, 4, 1);
+
+// Escapes the two characters that would break a JSON string. The messages
+// served here are fixed firmware strings, so nothing else needs handling.
+static size_t jsonStr(char *dst, size_t cap, const char *s) {
+  size_t n = 0;
+  if (cap < 3) return 0;
+  dst[n++] = '"';
+  for (; *s && n + 3 < cap; ++s) {
+    if (*s == '"' || *s == '\\') dst[n++] = '\\';
+    dst[n++] = *s;
   }
-  return "?";
+  dst[n++] = '"';
+  dst[n] = '\0';
+  return n;
 }
 
 static void handleRoot() {
-  String html;
-  html.reserve(1024);
-  html += F("<!DOCTYPE html><html><head><title>PaaniGuard</title>"
-            "<meta http-equiv=\"refresh\" content=\"5\">"
-            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-            "</head><body style=\"font-family:sans-serif\">");
-  html += F("<h1>PaaniGuard status</h1>");
-  html += F("<p>pH: ");
-  html += String(lastReadings.ph_value, 2);
-  html += F("</p><p>TDS (corrected): ");
-  html += String(lastCorrectedTdsPpm, 0);
-  html += F(" ppm</p><p>Temperature: ");
-  html += String(lastReadings.temperatureC, 1);
-  html += F(" C</p><p>Flow rate: ");
-  html += String(lastReadings.flowRateLPM, 1);
-  html += F(" L/min</p><p>Total usage: ");
-  html += String(lastReadings.totalLiters, 1);
-  html += F(" L</p><h2>Status: ");
-  html += severityLabel(lastFingerprint.severity);
-  html += F("</h2><p>");
-  html += lastFingerprint.alertMessage;
-  html += F("</p>");
-  if (lastFingerprint.severity == Severity::SEVERE) {
-    html += F("<p><b>");
-    html += lastFingerprint.authorityContact;
-    html += F("</b></p>");
+  server.sendHeader(F("Cache-Control"), F("no-cache"));
+  server.send_P(200, "text/html; charset=utf-8", WEBPAGE_HTML);
+}
+
+static void handleStatus() {
+  char msg[300], contact[160];
+  jsonStr(msg, sizeof msg, lastFingerprint.alertMessage);
+  jsonStr(contact, sizeof contact, lastFingerprint.authorityContact);
+
+  char buf[1100];
+  snprintf(buf, sizeof buf,
+    "{\"uptime\":%lu,\"demo\":%s,"
+    "\"verdict\":{\"level\":%d,\"message\":%s},"
+    "\"tds\":{\"ppm\":%.1f,\"mv\":%.0f,\"ok\":%s,\"calibrated\":%s,\"safeMax\":%d,\"severeMax\":%d},"
+    "\"flow\":{\"lpm\":%.2f,\"total\":%.2f,\"pulses\":%lu,\"ok\":true,\"seen\":%s},"
+    "\"temp\":{\"c\":%.1f,\"ok\":%s},\"ph\":{\"ok\":false},"
+    "\"net\":{\"ssid\":\"%s\",\"ip\":\"%s\",\"clients\":%d},"
+    "\"sys\":{\"heap\":%u},"
+    "\"drift\":{\"n\":%u,\"active\":%s,\"pct\":%.1f,\"recal\":%s,\"ref\":%d,\"limit\":%d},"
+    "\"contact\":%s}",
+    millis() / 1000UL, demoData ? "true" : "false",
+    (int)lastFingerprint.severity, msg,
+    lastCorrectedTdsPpm, lastReadings.tds_voltage_mV, tdsOk ? "true" : "false",
+    tdsCalibrated ? "true" : "false", (int)TDS_SAFE_MAX_PPM, (int)TDS_SEVERE_MAX_PPM,
+    lastReadings.flowRateLPM, lastReadings.totalLiters, lastFlowPulses, flowSeen ? "true" : "false",
+    lastReadings.temperatureC, tempOk ? "true" : "false",
+    SOFTAP_SSID, WiFi.softAPIP().toString().c_str(), (int)WiFi.softAPgetStationNum(),
+    (unsigned)ESP.getFreeHeap(),
+    (unsigned)drift_getCheckpointCount(), drift_hasTrend() ? "true" : "false",
+    drift_getDriftPercent(), drift_needsRecalibration() ? "true" : "false",
+    (int)TDS_REFERENCE_PPM, (int)DRIFT_MAX_CORRECTABLE_PERCENT,
+    contact);
+  server.sendHeader(F("Cache-Control"), F("no-store"));
+  server.send(200, "application/json", buf);
+}
+
+static void handleHistory() {
+  char buf[HIST_LEN * 6 + 48];
+  size_t n = snprintf(buf, sizeof buf, "{\"interval\":%lu,\"ppm\":[", histIntervalMs / 1000UL);
+  for (uint8_t i = 0; i < HIST_LEN; ++i) {
+    uint16_t v = hist[(histHead + i) % HIST_LEN];   // oldest first
+    if (i) buf[n++] = ',';
+    if (v == HIST_NONE) n += snprintf(buf + n, sizeof buf - n, "null");
+    else                n += snprintf(buf + n, sizeof buf - n, "%u", v);
   }
-  html += F("</body></html>");
-  server.send(200, "text/html", html);
+  snprintf(buf + n, sizeof buf - n, "]}");
+  server.sendHeader(F("Cache-Control"), F("no-store"));
+  server.send(200, "application/json", buf);
+}
+
+// POST /api/time, body = the phone's Unix time in seconds.
+static void handleTime() {
+  unsigned long t = strtoul(server.arg("plain").c_str(), nullptr, 10);
+  bool sane = t > 1700000000UL && t < 4102444800UL;       // after Nov 2023, before 2100
+  if (sane && (!timeSynced || millis() - lastTimeSyncMs > TIME_RESYNC_MS)) {
+    drift_syncDayIndexFromEpoch((time_t)t);                // writes flash, hence the limit
+    timeSynced = true;
+    lastTimeSyncMs = millis();
+  }
+  server.send(200, "application/json", sane ? "{\"ok\":true}" : "{\"ok\":false}");
+}
+
+// POST /api/calibrate: records a drift checkpoint from the current reading.
+// Every refusal exists to stop a bad checkpoint from silently skewing every
+// future reading, so they are strict.
+static void sendCalError(int code, const char *msg) {
+  char buf[200];
+  snprintf(buf, sizeof buf, "{\"ok\":false,\"error\":\"%s\"}", msg);
+  server.send(code, "application/json", buf);
+}
+
+static void handleCalibrate() {
+  const float ref = TDS_REFERENCE_PPM;
+  if (!timeSynced) {
+    sendCalError(409, "The device does not know today's date yet. Reload the page and try again.");
+  } else if (!calInputValid) {
+    sendCalError(409, "The TDS sensor is not responding.");
+  } else if (calInputPpm < ref * 0.5f || calInputPpm > ref * 1.5f) {
+    char m[160];
+    snprintf(m, sizeof m, "Reading is %d ppm, not close to the %d ppm reference. Put the probe in the reference solution and wait for the reading to settle.",
+             (int)calInputPpm, (int)ref);
+    sendCalError(422, m);
+  } else if (lastCheckpointMs && millis() - lastCheckpointMs < CHECKPOINT_MIN_GAP_MS) {
+    sendCalError(429, "A checkpoint was just recorded. Wait 10 minutes before recording another.");
+  } else {
+    drift_recordCheckpoint(calInputPpm);
+    lastCheckpointMs = millis();
+    char buf[120];
+    snprintf(buf, sizeof buf, "{\"ok\":true,\"measured\":%.1f,\"n\":%u}", calInputPpm,
+             (unsigned)drift_getCheckpointCount());
+    server.send(200, "application/json", buf);
+  }
+}
+
+// Captive portal: phones probe a known URL (/generate_204 on Android,
+// /hotspot-detect.html on Apple, /connecttest.txt on Windows, ...) to decide
+// whether the network has internet. Any unknown URL is redirected to the page,
+// so the probe fails the "is this real internet" test and the phone pops the
+// sign-in sheet pointing at the status page.
+static void handleRedirect() {
+  server.sendHeader(F("Location"), String(F("http://")) + PORTAL_IP.toString() + "/", true);
+  server.send(302, "text/plain", "");
 }
 
 void webserver_init() {
+  for (uint8_t i = 0; i < HIST_LEN; ++i) hist[i] = HIST_NONE;
+
+  dns.setErrorReplyCode(DNSReplyCode::NoError);
+  dns.start(53, "*", PORTAL_IP);
+
   server.on("/", handleRoot);
+  server.on("/api/status", handleStatus);
+  server.on("/api/history", handleHistory);
+  server.on("/api/time", HTTP_POST, handleTime);
+  server.on("/api/calibrate", HTTP_POST, handleCalibrate);
+  server.onNotFound(handleRedirect);
   server.begin();
-  Serial.println(F("webserver: local status page started on port 80"));
+  Serial.println(F("webserver: status page + API + captive portal on 192.168.4.1"));
 }
 
 void webserver_handleClient() {
+  dns.processNextRequest();
   server.handleClient();
 }
 
+void webserver_setDemo(bool on) {
+  demoData = on;
+}
+
+void webserver_setHistoryInterval(unsigned long ms) {
+  histIntervalMs = ms < 1000 ? 1000 : ms;
+}
+
+void webserver_setCalibrationInput(float tempCompensatedPpm, bool valid) {
+  calInputPpm = tempCompensatedPpm;
+  calInputValid = valid;
+}
+
+void webserver_setSensorStatus(bool tdsOkNow, bool flowSeenNow, bool tempOkNow, bool tdsCalibratedNow) {
+  tdsOk = tdsOkNow;
+  flowSeen = flowSeenNow;
+  tempOk = tempOkNow;
+  tdsCalibrated = tdsCalibratedNow;
+}
+
 void webserver_updateStatus(const SensorReadings &readings, float correctedTdsPpm,
-                             const FingerprintResult &fingerprint) {
+                             const FingerprintResult &fingerprint, unsigned long flowPulses) {
   lastReadings = readings;
   lastCorrectedTdsPpm = correctedTdsPpm;
   lastFingerprint = fingerprint;
+  lastFlowPulses = flowPulses;
+
+  if (!histStarted || millis() - lastHistMs >= histIntervalMs) {
+    histStarted = true;
+    lastHistMs = millis();
+    hist[histHead] = tdsOk ? (uint16_t)constrain((long)correctedTdsPpm, 0L, 60000L) : HIST_NONE;
+    histHead = (histHead + 1) % HIST_LEN;
+  }
 }

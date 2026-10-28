@@ -63,6 +63,17 @@ float drift_getDriftPercent();
 // the probe is recalibrated.
 bool drift_needsRecalibration();
 
+// Stored checkpoints (all of them, in or out of the rolling window).
+uint8_t drift_getCheckpointCount();
+
+// True when the window holds enough checkpoints (2+, on different days) for
+// drift_applyBaselineCorrection() to actually change a reading. Until then the
+// correction is a pass-through, so the sensor is effectively uncalibrated.
+bool drift_hasTrend();
+
+// Forget every checkpoint (persisted). Use after replacing the probe.
+void drift_clearCheckpoints();
+
 // Convenience: runs both mechanisms in order (temp compensation, then
 // baseline correction). This is what the rest of the firmware should call.
 float drift_getCorrectedTds(float rawTdsPpm, float temperatureC);
