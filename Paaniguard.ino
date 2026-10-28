@@ -8,6 +8,11 @@
 #include "webserver.h"
 #include "fingerprinting.h"
 #include "drift_compensation.h"
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
+OneWire oneWire(PIN_ONEWIRE_TEMP); // D6
+DallasTemperature dallas(&oneWire);
 
 Adafruit_SSD1306 display(128, 64, &Wire, -1);
 Adafruit_ADS1115 ads;
@@ -217,6 +222,9 @@ void setup() {
   drift_init();   // mounts LittleFS, loads saved calibration checkpoints
   connectivity_startSoftAP();
   webserver_init();
+  dallas.begin();
+  dallas.setWaitForConversion(false);
+  dallas.requestTemperatures();
 #if DEMO_SENSOR_DATA
   webserver_setDemo(true);
   webserver_setHistoryInterval(1000);   // chart fills in two minutes instead of an hour
@@ -265,6 +273,13 @@ void loop() {
     tdsPpm = (133.42 * pow(tdsComp, 3) - 255.86 * pow(tdsComp, 2) + 857.39 * tdsComp) * 0.5;
     if (tdsPpm < 0) tdsPpm = 0;
   }
+
+  float rawTemp = dallas.getTempCByIndex(0);
+  if (rawTemp > -50.0 && rawTemp < 85.0) {
+    tempC = rawTemp;
+    tempOk = true;
+  }
+  dallas.requestTemperatures();
 #endif
 
   // Two separate corrections (see drift_compensation.h), applied in this order:
