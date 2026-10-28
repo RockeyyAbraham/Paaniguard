@@ -159,21 +159,23 @@ Real-world hardware prototyping entails physical anomalies, thermal overloads, a
 
 ### 6.2 Experimental Validation of the 4 Project Objectives
 
-#### 6.2.1 Objective 1 Validation: Runtime Drift Compensation (Simulation & Math Proof)
-Following the protocol defined in the Nature Scientific Reports base paper, electrochemical electrode drift was modeled over a 7-day period with an uncorrected baseline drift of $\sim 0.8\text{ ppm/hour}$ ($19.2\text{ ppm/day}$):
+#### 6.2.1 Objective 1 Validation: Runtime Drift Compensation (Software Simulation)
+Because physical 7-day reference-solution testing was not feasible in the available time, the drift-correction algorithm was validated against a software simulation parameterized with the drift rate reported in the base paper (0.8 ppm/hr).
 
-```
-+-----------------------------------------------------------------------------------------+
-| Day | True TDS | Uncorrected Sensor TDS | Corrected PaaniGuard TDS | Error Reduction     |
-+-----------------------------------------------------------------------------------------+
-| 0   | 342 ppm  | 342.0 ppm (0.0% drift) | 342.0 ppm                | 0.0% error          |
-| 1   | 342 ppm  | 361.2 ppm (+5.6% drift)| 343.1 ppm                | 5.6% -> 0.3% error  |
-| 3   | 342 ppm  | 399.6 ppm (+16.8%)     | 344.2 ppm                | 16.8% -> 0.6% error |
-| 5   | 342 ppm  | 438.0 ppm (+28.0%)     | 345.8 ppm                | 28.0% -> 1.1% error |
-| 7   | 342 ppm  | 476.4 ppm (+39.3%)     | RECALIBRATION FLAGGED    | Self-identified     |
-+-----------------------------------------------------------------------------------------+
-```
-*Outcome:* The least-squares baseline compensation in `drift_compensation.cpp` successfully maintained measurement error **under 1.2%** over the correctable operating window. Beyond Day 6, the system autonomously asserted the `driftExceeded` flag, updating the web dashboard and OLED to alert the user rather than reporting falsely high TDS.
+Following the protocol defined in the base paper [1] (Sharma et al.), electrochemical electrode drift was modeled over a 7-day period with an uncorrected baseline drift of $0.8\text{ ppm/hour}$ ($19.2\text{ ppm/day}$) on a $342.0\text{ ppm}$ standard NaCl reference solution, subject to Gaussian measurement noise ($\sigma = 0.8\text{ ppm}$). The firmware's rolling-baseline least-squares regression algorithm (`drift_compensation.cpp`, configured with `DRIFT_WINDOW_DAYS = 7` and `DRIFT_MAX_CORRECTABLE_PERCENT = 15.0`) was simulated day-by-day via `simulate_drift.py`:
+
+| Day | True TDS (ppm) | Uncorrected TDS (ppm) | Sensor Drift (%) | Corrected TDS (ppm) | Residual Error (%) | Firmware Status / Action |
+| :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| 0 | 342.0 ppm | 342.4 ppm |  +0.1% | 342.4 ppm | 0.12% | Initial Baseline |
+| 1 | 342.0 ppm | 361.7 ppm |  +5.8% | 341.3 ppm | 0.20% | Corrected (Active) |
+| 2 | 342.0 ppm | 380.2 ppm | +11.2% | 341.5 ppm | 0.13% | Corrected (Active) |
+| 3 | 342.0 ppm | 400.9 ppm | +17.2% | 342.8 ppm | 0.22% | RECALIBRATION REQUIRED |
+| 4 | 342.0 ppm | 418.4 ppm | +22.3% | 341.1 ppm | 0.25% | RECALIBRATION REQUIRED |
+| 5 | 342.0 ppm | 437.6 ppm | +28.0% | 341.6 ppm | 0.13% | RECALIBRATION REQUIRED |
+| 6 | 342.0 ppm | 457.4 ppm | +33.7% | 342.9 ppm | 0.27% | RECALIBRATION REQUIRED |
+| 7 | 342.0 ppm | 475.0 ppm | +38.9% | 341.4 ppm | 0.18% | RECALIBRATION REQUIRED |
+
+*Outcome:* The least-squares baseline compensation in `drift_compensation.cpp` successfully maintained residual measurement error **below 0.3%** across the correctable operating window (Days 1–2). At Day 3 (accumulated drift $= 17.2\% > 15.0\%$), the system autonomously asserted the `driftExceeded = true` flag, commanding the OLED and web HMI to display *"Recalibration Required"* rather than reporting deceptively precise numbers. The full simulation script and graphical trajectory are archived in `simulate_drift.py` and `drift_simulation_results.png`.
 
 #### 6.2.2 Objective 2 Validation: Actionable TDS-Pattern Alerting
 Tested across controlled physical benchmarks:
@@ -250,12 +252,13 @@ PaaniGuard achieves **over an 88% cost reduction** compared to commercial consum
 # CHAPTER 8: CONCLUSION AND FUTURE SCOPE
 
 ### 8.1 Summary of Achievements
-1. **Closing the Literature Drift Gap:** Successfully designed, coded, and demonstrated the unbuilt software drift compensation identified in the *Nature Scientific Reports* Feb 2026 paper, keeping TDS errors below 1.2%.
+1. **Closing the Literature Drift Gap:** Successfully designed, coded, and demonstrated the unbuilt software drift compensation identified in the *Nature Scientific Reports* Feb 2026 paper [1] (Sharma et al.), keeping simulated residual TDS errors below 0.3% over the correctable operating window.
 2. **Deterministic Edge Annunciation:** Integrated multi-tier audio-visual alarming (Active Buzzer + Discrete Red LED) with sub-85 ms local response time upon threshold violation.
 3. **Offline SoftAP Captive Portal:** Delivered a standalone responsive web dashboard hosted on `192.168.4.1`, verified in router-off emergency testing.
 4. **Resolved 7 Real-World Hardware Failures:** Overcame critical hardware faults (short-circuits, floating ADCs, ESD diode clamping, and power rail starvation) to build a thermally stable, level-shifted prototype.
 
 ### 8.2 Current Prototype Limitations
+- **Simulation-Only Drift Validation:** Drift compensation is validated in simulation only; hardware validation against a physical reference solution over a multi-day period remains future work.
 - **Breadboard Mechanical Reliability:** Solderless breadboard spring clips and Dupont jumpers are vulnerable to oxidation and mechanical shock over multi-month deployments.
 - **Omission of Physical Actuation:** Automatic physical water cutoff via solenoid valve was excluded to ensure electrical safety; the system operates as an advisory and alerting node only.
 - **Power Grid Dependency:** Relies on 5V USB mains power; lacks an integrated solar harvester or LiFePO4 battery uninterruptible power supply.
@@ -269,8 +272,8 @@ PaaniGuard achieves **over an 88% cost reduction** compared to commercial consum
 
 # BIBLIOGRAPHY & REFERENCES (IEEE FORMAT)
 
-1. **[1] M. A. Rahman, S. K. Roy, and P. K. Debnath,** *"An intelligent, low-cost water quality monitoring system with on-device machine learning and cloud integration,"* *Scientific Reports*, vol. 16, no. 1, Art. no. 37287, Feb. 2026, doi: 10.1038/s41598-026-37287-3.
-2. **[2] K. S. Kumar, R. Venkat, and N. S. Rao,** *"IoT-based system for real-time water quality monitoring and advanced turbidity and pH sensor calibration to improve accuracy and reliability using ThingSpeak,"* *IoT (MDPI)*, vol. 7, no. 2, Art. no. 42, May 2026, doi: 10.3390/iot7020042.
+1. **[1] S. Sharma, D. Mishra, A. Yadav, B. Gami, and E. S. Madhan,** *"An intelligent, low-cost water quality monitoring system with on-device machine learning and cloud integration,"* *Scientific Reports*, vol. 16, Art. no. 11106, Feb. 2026, doi: 10.1038/s41598-026-37287-3.
+2. **[2] M. Al Drees, A. E. Rahma, S. Daffalla, and R. Alsudais,** *"IoT-based system for real-time water quality monitoring and advanced turbidity and pH sensor calibration to improve accuracy and reliability using ThingSpeak,"* *IoT (MDPI)*, vol. 7, no. 2, Art. no. 42, May 2026, doi: 10.3390/iot7020042.
 3. **[3] Bureau of Indian Standards,** *"Drinking Water — Specification (Second Revision of IS 10500),"* IS 10500:2012, New Delhi, India, May 2012.
 4. **[4] World Health Organization,** *"Guidelines for Drinking-water Quality: Fourth Edition Incorporating the First and Second Addenda,"* WHO Guidelines Approved by the Guidelines Review Committee, Geneva, World Health Organization, 2022.
 5. **[5] Texas Instruments,** *"ADS111x Ultra-Small, Low-Power, 16-Bit Analog-to-Digital Converters with Internal Reference,"* ADS1115 Datasheet, SBAS444D, May 2009, Revised Jan. 2018.

@@ -23,11 +23,11 @@ Access to clean, potable drinking water is a basic human necessity, yet municipa
 
 #### 1.2.1 The Stated Open Problem in Peer-Reviewed Literature
 The fundamental academic justification for PaaniGuard originates from recent findings published in peer-reviewed environmental IoT literature:
-1. **Primary Base Paper:** *An intelligent, low-cost water quality monitoring system with on-device machine learning and cloud integration*, published in **Scientific Reports (Nature Portfolio), February 2026** (DOI: `10.1038/s41598-026-37287-3`).
+1. **Primary Base Paper:** S. Sharma, D. Mishra, A. Yadav, B. Gami, and E. S. Madhan, *"An intelligent, low-cost water quality monitoring system with on-device machine learning and cloud integration,"* published in ***Scientific Reports***, vol. 16, Art. no. 11106, Feb. 2026 (published 26 Feb 2026), DOI: `10.1038/s41598-026-37287-3` [1].
    - The authors developed an ESP32-based multi-sensor monitor running TinyML across three impurity profiles (99.28% classification accuracy).
    - Crucially, during a continuous 24-hour stability bench run, while temperature and pH remained stable ($<1\%$ variance), **TDS and turbidity experienced severe drift of 5% to 8% over 24 hours** (~$0.8\text{ ppm/hour}$ TDS drift) caused by electrode polarization and micro-biofouling.
    - The paper explicitly concluded: *"A software-based auto-zeroing and runtime drift compensation mechanism is essential for real-world long-term deployment"* — **and left this mechanism unbuilt as future work**.
-2. **Secondary Methodology Reference:** *IoT-based system for real-time water quality monitoring and advanced turbidity and pH sensor calibration to improve accuracy and reliability using ThingSpeak*, published in **IoT (MDPI), May 2026** (DOI: `10.3390/iot7020042`).
+2. **Secondary Methodology Reference:** M. Al Drees, A. E. Rahma, S. Daffalla, and R. Alsudais, *"IoT-based system for real-time water quality monitoring and advanced turbidity and pH sensor calibration to improve accuracy and reliability using ThingSpeak,"* published in ***IoT (MDPI)***, vol. 7, no. 2, Art. no. 42, May 2026, DOI: `10.3390/iot7020042` [2].
    - Defined structured calibration intervals (daily and weekly verifications) but explicitly omitted runtime drift compensation and multi-week sensor aging evaluations.
 
 #### 1.2.2 PaaniGuard's Core Novel Contribution
