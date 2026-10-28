@@ -1,295 +1,367 @@
-# PaaniGuard — Master PPT Presentation Prompt & Slide-by-Slide Guide
-**Target Output:** 12-Slide Final Project-Based Learning (PBL) Presentation  
-**Target Platform:** PowerPoint (.pptx), Google Slides, Marp Markdown, or LaTeX Beamer  
-**Author / Team:** PaaniGuard Project Team (Richard, Rishi, Pair Team)  
-**Hardware Platform:** NodeMCU v2 (ESP8266-12E), ADS1115 16-Bit ADC, SSD1306 OLED, DS18B20 Temp Probe, YF-S201 Flow Turbine, Submersible Analog TDS Sensor  
-**Base Research Paper:** *Nature Scientific Reports* (Feb 2026, DOI: `10.1038/s41598-026-37287-3`)  
-**Calibration Standard:** *MDPI IoT* (May 2026, DOI: `10.3390/iot7020042`) | BIS IS 10500:2012 | WHO 4th Edition  
-**Locked Development Budget:** **₹1,900.00 INR (~$22.89 USD)**
+# PaaniGuard — Master Claude Prompt for 12-Slide PBL Presentation
+**Target LLM:** Claude 3.5 Sonnet / Claude 3.7 Sonnet  
+**Output Objective:** Flawless, academically bulletproof 12-slide presentation content and design layout for the PaaniGuard engineering defense.  
+**Hardware & System Realities:**
+- **MCU:** NodeMCU v2 (ESP8266-12E, 80 MHz Tensilica, 80 KB RAM, 4 MB Flash).
+- **Sensors:** Submersible Analog TDS Probe (titanium pins) via ADS1115 16-bit Sigma-Delta ADC (`0x48`), DS18B20 1-Wire Waterproof Temperature Probe (Pin `D6`, $4.7\text{ k}\Omega$ pull-up, reading live 29.0°C), YF-S201 Hall-effect Flow Turbine (Pin `D5` via $2.2\text{ k}\Omega / 3.3\text{ k}\Omega$ voltage divider stepping 5V to 3.0V, $450\text{ pulses/L}$).
+- **Actuators:** SSD1306 0.96" I2C OLED (`0x3C`), Active Buzzer (Pin `D0`), Discrete Red Alert LED (Pin `D4` via $330\,\Omega$ resistor).
+- **Network:** Standalone SoftAP (`PaaniGuard-Setup`, `192.168.4.1`) with DNS Captive Portal—100% offline-first.
+- **Physical Build:** Single 830-point breadboard hub as the passive routing matrix (5V `VU`, 3.3V, GND, I2C, flow divider rows 20–22, temp pull-up rows 10–12); NodeMCU mounted off-board along the enclosure sidewall ("flowing outside") via flying Dupont leads.
+- **Academic Foundation:** Closes the 5–8% 24h electrochemical drift gap left unbuilt in *Nature Scientific Reports* (Feb 2026, Sharma et al., DOI: `10.1038/s41598-026-37287-3`) via rolling least-squares baseline regression (`drift_compensation.cpp`). Validated via software simulation (`simulate_drift.py`) with 15% recalibration limit. Secondary calibration standard: *MDPI IoT* (May 2026, Al Drees et al., DOI: `10.3390/iot7020042`).
+- **Locked Budget:** Exactly **₹1,900.00 INR (~$22.89 USD)**.
+- **Scope Exclusion:** Analog pH sensor and 12V Solenoid valve were deliberately omitted (preventing glass electrode biofouling and water-hammer pipe destruction).
 
 ---
 
-## HOW TO USE THIS DOCUMENT
-1. **Direct Generation via AI Tools:** Copy Section 1 ("Master System Prompt") into ChatGPT-4o, Claude 3.7, or Gamma.app to generate a slide deck.
-2. **Manual Slide Assembly by Richard:** Use Section 2 ("Slide-by-Slide Specifications") which contains exact on-slide bullet points, visual layout instructions, oral speaker notes, and examiner Q&A defense scripts for all 12 slides.
-3. **Beamer / Marp Compilation:** Section 3 provides the compile-ready Marp Markdown deck for direct PDF export.
+```markdown
+# SYSTEM PROMPT FOR CLAUDE: PAANIGUARD 12-SLIDE PRESENTATION GENERATION
+
+You are a distinguished Professor of Embedded Systems and Principal IoT Architect. You are helping an engineering team (Richard, Rishi, and Team) prepare a high-impact, academically rigorous, and visually stunning 12-slide presentation for their final Project-Based Learning (PBL) viva defense.
+
+The presentation must strictly adhere to the 12-slide course template provided in `CONTENT FOR PBL.docx`.
+
+### YOUR CORE DIRECTIVES:
+1. **Tone:** Authoritative, quantitative, confident, and deeply grounded in real embedded engineering. Avoid superficial filler, fluff, or generic high-level generalities. Use exact pin numbers, resistor values, memory footprints, mathematical formulas, and benchmark metrics.
+2. **Slide-by-Slide Content:** For every slide from 1 to 12, provide:
+   - **Slide Header & Subtitle**
+   - **Visual Layout & Formatting Directives** (card layouts, visual hierarchy, accent colors, contrast cues)
+   - **Exact On-Slide Text / Bullet Points** (punchy, formatted with bold keywords, ready to paste directly onto slides)
+   - **Spoken Oral Defense Script (Speaker Notes)**: The exact words the student should speak to the examiners, including anticipated defenses.
+   - **Visual Asset / Diagram Generation Prompt**: For slides requiring diagrams, schematics, or graphics (Slides 4, 5, 7, 8, 10, 11), provide a **pinpoint image/diagram generation prompt** formatted for Claude Artifacts (SVG/HTML), Mermaid.js, or AI text-to-image models (Midjourney/DALL-E).
+   - **NOTE ON SLIDE 9:** DO NOT provide an AI image prompt for Slide 9. The team has real, high-resolution physical bench photographs (the single-breadboard box, off-board sidewall MCU, OLED, test beaker, and `drift_simulation_results.png`). Structure Slide 9 around these real assets.
 
 ---
 
-# SECTION 1: MASTER AI PROMPT FOR SLIDE DECK GENERATION
-
-```text
-You are an expert academic presentation designer and embedded systems engineer. Generate a professional, high-impact 12-slide engineering presentation for an undergraduate Project-Based Learning (PBL) defense based strictly on the following technical specifications:
-
-PROJECT TITLE: PaaniGuard — Autonomous IoT Water Quality Anomaly Detection & Usage Monitoring System
-HARDWARE: NodeMCU v2 (ESP8266-12E), ADS1115 16-bit I2C ADC, SSD1306 0.96" OLED, DS18B20 1-Wire Temperature Probe, YF-S201 Flow Sensor (with 2.2k/3.3k voltage divider stepping 5V to 3.0V), Submersible Analog TDS Probe (dual titanium electrodes).
-FIRMWARE: C++ compiled via arduino-cli on ESP8266 Core v3.0.2+, non-blocking cooperative multitasking, IRAM-anchored flow interrupt ISR, standalone SoftAP web server (192.168.4.1) with captive portal, LittleFS persistent flash storage.
-NOVEL RESEARCH CONTRIBUTION: Addressing and closing the critical open gap identified in the base paper (Nature Scientific Reports, Feb 2026, DOI: 10.1038/s41598-026-37287-3) regarding 5–8% 24-hour electrochemical TDS electrode drift through an on-device linear least-squares regression baseline compensation algorithm.
-BUDGET: Exactly ₹1,900.00 INR (~$22.89 USD).
-SCOPE BOUNDARIES: Analog pH sensor and 12V Solenoid Shutoff Valve are explicitly OUT-OF-SCOPE (alert-and-advisory edge monitor, preventing fragile glass electrode failures and water hammer/electrical noise hazards).
-PHYSICAL TOPOLOGY: Single 830-point breadboard central routing hub; NodeMCU suspended off-board along the enclosure sidewall to isolate RF emissions and regulator heat; flying Dupont interconnections.
-
-Follow the exact 12-slide structure from the course syllabus:
-Slide 1: Title Slide (Project title, team, roll numbers, institution)
-Slide 2: Introduction & Objective (Background, Nature 2026 literature gap, 4 core objectives)
-Slide 3: Problem Statement & Scope (Real-world contamination issues, operational scope boundaries)
-Slide 4: Proposed System / Overview (High-level architecture, end-to-end processing pipeline)
-Slide 5: Block Diagram (Power, inputs, MCU, outputs, standalone SoftAP network)
-Slide 6: Hardware Components List (Detailed ₹1,900 BOM table with specs and sourcing)
-Slide 7: Circuit Diagram / Schematic & Topology (Pinout matrix, single breadboard hub, off-board MCU)
-Slide 8: Software & Firmware Architecture (Bare-metal loop, drift compensation algorithm, memory footprint)
-Slide 9: Working Prototype / Results & Debugging (Photos, 7 physical debugging chronicles, bench validation)
-Slide 10: Advantages & Applications (88% cost reduction, offline resilience, community use cases)
-Slide 11: Limitations & Future Scope (Breadboard mechanical limits, PCB fabrication, LoRaWAN)
-Slide 12: Reference & Conclusion (IEEE citations, final concluding statement)
-
-Tone: Rigorous, quantitative, academically authoritative, confident engineering defense.
-```
-
----
-
-# SECTION 2: SLIDE-BY-SLIDE SPECIFICATIONS & ORAL DEFENSE MANUAL
-
----
-
-### SLIDE 1: TITLE SLIDE
-- **Slide Title:** **PaaniGuard**
+## SLIDE 1: TITLE SLIDE
+- **Title:** **PaaniGuard**
 - **Subtitle:** Autonomous IoT Water Quality Anomaly Detection & Usage Monitoring System
-- **Key Badges / Tags:** 
-  - Low-Cost Edge Computing ($<\$23$)
-  - 24h Electrochemical Drift Compensation
-  - Offline-First Local Advisory Architecture
-- **Team Information Block:**
-  - **Presented By:** Richard, Rishi, and Team
-  - **Department:** Department of Electronics and Communication Engineering / Computer Science
+- **Tagline Badges:** Edge Computing ($<\$23$) | 24h Electrochemical Drift Compensation | Offline-First SoftAP Architecture
+- **Metadata Card:**
+  - **Presented By:** Richard, Rishi & Project Team
+  - **Department:** Electronics & Communication Engineering / Computer Science
   - **Institution:** Institute of Technology, Kerala
-  - **Academic Year:** 2026
-- **Visual Placement:**
-  - High-resolution photograph of the assembled PaaniGuard prototype box (showing the elevated NodeMCU on the enclosure sidewall, glowing OLED screen, TDS probe and DS18B20 submerged in the test water beaker).
-- **Spoken Oral Defense Script (Examiner Pitch):**
-  > *"Good morning, respected examiners. Today we present PaaniGuard, an autonomous, low-cost edge IoT system engineered for continuous water quality anomaly detection and volumetric consumption monitoring. Built for under ₹1,900, PaaniGuard directly addresses an open research problem published in Nature Scientific Reports in February 2026: namely, that low-cost TDS sensors suffer from severe electrochemical electrode drift over time. PaaniGuard closes this gap through an on-device mathematical drift compensation engine, deterministic local audiovisual alarms, and an offline-first SoftAP web server that functions without any external internet connection."*
+  - **Academic Session:** 2026
+- **Layout:** High-contrast modern dark-slate aesthetic. Right-hand feature frame reserved for the real physical prototype photo.
+- **Speaker Script:**
+  > *"Good morning, respected examiners. Today we present PaaniGuard: an autonomous, low-cost edge IoT system engineered for domestic water quality anomaly detection and volumetric consumption metering. Built for just ₹1,900, PaaniGuard directly addresses an open research problem published in Nature Scientific Reports in February 2026: namely, that low-cost electrochemical TDS sensors suffer from severe 5 to 8% daily baseline drift. PaaniGuard closes this gap through an on-device mathematical drift compensation engine, deterministic local audiovisual alarms, and an offline-first SoftAP web server that functions without any external internet connection."*
 
 ---
 
-### SLIDE 2: INTRODUCTION & OBJECTIVES
-- **Slide Layout:** 2-Column Split (Left: Problem Context & Research Gap; Right: The 4 Locked Objectives).
-- **Column 1: Background & Literature Gap**
-  - **The Water Crisis:** Over 2.2 billion people lack access to reliably safe drinking water (UN SDG 6). In Kerala, post-flood pipeline contamination and well-water contamination pose recurring health hazards.
-  - **Current Limitations:** Laboratory grab-sampling is slow (24–72 hr turnaround). Existing commercial IoT devices cost >$180 and depend on cloud servers.
-  - **The Nature 2026 Research Gap:** The base paper (*Rahman et al., Nature Scientific Reports*, Feb 2026) demonstrated edge ML water monitoring but explicitly identified an unsolved 5–8% daily electrochemical TDS drift that caused false contamination alerts after 24 hours.
-- **Column 2: The 4 Locked Project Objectives**
-  - **Objective 1 (Drift Compensation):** Implement an on-device linear least-squares regression algorithm to track baseline shift and keep measurement error $<1.5\%$ over 7 days.
-  - **Objective 2 (Actionable Pattern Alerting):** Replace flat binary alarms with multi-tier anomaly fingerprinting (Safe, Watch, Caution, Severe) delivering local audiovisual alerts in $<85\text{ ms}$.
-  - **Objective 3 (Offline SoftAP Captive Portal):** Host a standalone web dashboard at `192.168.4.1` with zero internet dependency (router-off resilience).
+## SLIDE 2: INTRODUCTION & OBJECTIVES
+- **Slide Title:** Introduction & The 4 Locked Engineering Objectives
+- **Slide Subtitle:** Resolving the 24h Electrochemical Drift Gap in Decentralized Water Monitoring
+- **Layout:** 2-Column Comparative Split (Left: The Environmental & Literature Problem; Right: The 4 Locked Objectives).
+- **Left Column: Problem & Literature Gap**
+  - **Drinking Water Crisis:** UN SDG 6 Target 6.1 highlights 2.2B people lacking safely managed water. In Kerala, post-flood pipeline contamination and well-water contamination pose recurring health hazards.
+  - **Failure of Existing IoT Solutions:** Commercial systems cost >$180 and depend entirely on cloud connectivity. Lab grab-sampling requires 24–72 hours.
+  - **The Nature 2026 Research Gap:** The primary base paper (*Sharma et al., Nature Scientific Reports*, Feb 2026, DOI: `10.1038/s41598-026-37287-3`) demonstrated edge ML water classification but explicitly noted that electrochemical TDS sensors drift by 5% to 8% within 24 hours (~$0.8\text{ ppm/hr}$), concluding that software-based runtime drift correction is essential, but leaving it unbuilt as future work.
+- **Right Column: The 4 Locked Project Objectives**
+  - **Objective 1 (Drift Compensation):** Close the *Nature 2026* gap by building an on-device rolling-baseline least-squares regression engine (`drift_compensation.cpp`) keeping residual error $<0.3\%$ in simulation.
+  - **Objective 2 (Actionable Pattern Alerting):** Replace flat binary alarms with 4-tier anomaly fingerprinting (Normal, Watch, Caution, Severe) delivering local audiovisual alerts in $<85\text{ ms}$.
+  - **Objective 3 (Offline SoftAP Captive Portal):** Host a standalone web dashboard at `192.168.4.1` (`PaaniGuard-Setup`) with zero external router or internet dependency.
   - **Objective 4 (Integrated Flow Logging):** Combine real-time contamination detection with volumetric consumption tracking ($450\text{ pulses/L}$) persisted to LittleFS flash.
-- **Oral Defense Script:**
-  > *"Most student water projects simply plug an analog TDS sensor into an Arduino and trigger a buzzer if the reading crosses 500 ppm. That is not novel engineering. In real deployments, probe electrodes undergo ionic polarization and surface fouling, causing readings to drift upward by 5 to 8% within 24 hours. The Feb 2026 Nature Scientific Reports base paper highlighted this exact gap. Our primary objective is closing that gap directly in embedded software, while ensuring our system remains completely functional even during total power grid or broadband internet blackouts."*
+- **Speaker Script:**
+  > *"Most student projects connect a sensor to a buzzer and call it smart. That ignores physical reality. In continuous immersion, metallic electrode probes undergo ionic polarization and surface fouling, causing readings to drift upward by 5 to 8% per day. Sharma et al.'s Feb 2026 Nature paper proved this drift exists but left software correction as an unsolved problem. Our project's primary reason for existence is closing that specific peer-reviewed gap directly in embedded firmware."*
 
 ---
 
-### SLIDE 3: PROBLEM STATEMENT & OPERATING SCOPE
-- **Slide Layout:** Card Comparison (Problem Statement Card vs. Locked Scope & Boundaries Card).
-- **Card 1: Problem Statement**
-  - Domestic overhead tanks and community water networks suffer from sudden sewage infiltration, pipe rust detachment, and industrial ionic contamination.
-  - Users have zero visibility into their real-time water quality until waterborne sickness occurs.
-- **Card 2: Operational Scope & Deliberate Exclusions**
-  - **IN-SCOPE (Fully Implemented & Bench-Verified):**
-    - High-resolution TDS sensing via external 16-bit Sigma-Delta ADC (ADS1115).
-    - Precision thermal compensation via Dallas 1-Wire sensor (DS18B20) to $25.0\text{°C}$ international standard.
-    - Hall-effect inline flow turbine metering (YF-S201) with passive level-shifting.
-    - Standalone SoftAP captive portal web server (`192.168.4.1`) and local SSD1306 OLED HMI.
-    - Sub-85 ms local acoustic (Buzzer) and optical (Red LED) emergency alerting.
-  - **OUT-OF-SCOPE (Deliberately Excluded with Academic Justification):**
-    - *Analog pH Sensor:* Fragile glass bulb requires monthly recalibration in KCl buffer; biofouling causes severe drift in unattended plumbing.
-    - *12V Solenoid Shutoff Valve:* Slamming shut domestic water lines creates catastrophic hydraulic water hammer (shock waves); relay inductive kickback introduces electrical noise into sensitive analog lines. PaaniGuard operates as an **advisory and alerting node**, empowering users to take corrective action.
-- **Examiner Trap Question & Defense:**
-  - *Q: "Why did you omit the pH sensor and automatic shutoff valve?"*
-  - *Defense:* *"In industrial instrumentation design, sensor longevity is paramount. Cheap glass pH electrodes dry out and fail within 3 weeks in continuous immersion without maintenance, rendering automated shutoff unsafe. Furthermore, slamming an un-cushioned solenoid valve creates water hammer pressures exceeding 10 bar, risking domestic pipe rupture. We intentionally prioritized measurement stability, drift compensation, and deterministic alerting over fragile actuation."*
+## SLIDE 3: PROBLEM STATEMENT & SCOPE
+- **Slide Title:** Problem Statement & Operational Scope Boundaries
+- **Slide Subtitle:** Engineering Focus: High Measurement Integrity Over Fragile Complexity
+- **Layout:** Side-by-Side Dual Cards (In-Scope System Capabilities vs. Out-of-Scope Justifications).
+- **Card 1: Fully Implemented & Bench-Verified (In-Scope)**
+  - **Submersible Titanium TDS Sensing:** Digitized via external 16-bit Sigma-Delta ADC (ADS1115) at $7.8\text{ }\mu\text{V}$ LSB resolution.
+  - **Thermal Normalization Anchor:** DS18B20 1-Wire probe with $4.7\text{ k}\Omega$ pull-up normalizing ionic readings to the international standard of $25.0\text{°C}$.
+  - **Hall-Effect Turbine Metering:** YF-S201 inline sensor with passive $2.2\text{k}/3.3\text{k}$ resistive divider stepping 5V pulses down to safe 3.0V logic.
+  - **Local & Offline HMI:** SSD1306 0.96" OLED (`0x3C`), Active Buzzer (`D0`), Red Alert LED (`D4`), and local SoftAP Web Dashboard (`192.168.4.1`).
+- **Card 2: Deliberately Out-of-Scope (With Academic Justification)**
+  - **Analog pH Sensor (Excluded):** Glass bulb electrodes dehydrate and biofoul within 2–3 weeks in continuous plumbing; requiring bi-weekly buffer recalibration makes unattended domestic deployment infeasible.
+  - **12V Solenoid Shutoff Valve (Excluded):** Slamming shut high-pressure domestic water pipes causes catastrophic hydraulic shock (water hammer $>10\text{ bar}$); de-energizing inductive coils creates $>50\text{V}$ flyback voltage that destabilizes analog breadboard lines. PaaniGuard functions strictly as an **advisory and alerting edge monitor**.
+- **Speaker Script:**
+  > *"We made deliberate, mathematically sound scoping decisions. Cheap glass pH electrodes dry out and drift by over 1.5 pH within three weeks, rendering automated actuation dangerous. Furthermore, slamming an un-cushioned solenoid valve creates water hammer pressures that can rupture domestic pipe fittings. We intentionally prioritized rock-solid measurement integrity, drift compensation, and deterministic alerting over fragile mechanical actuation."*
 
 ---
 
-### SLIDE 4: PROPOSED SYSTEM / HIGH-LEVEL OVERVIEW
-- **Slide Layout:** Horizontal End-to-End Architecture Flow (4 Sequential Process Blocks).
-- **Block 1: Sensing Subsystem**
-  - Submersible Dual-Titanium TDS Probe (Continuous ionic conduction sampling).
-  - DS18B20 Stainless Probe (Real-time temperature reference).
-  - YF-S201 Inline Hall Turbine (Non-intrusive volumetric metering).
-- **Block 2: Signal Conditioning & Interfacing**
-  - ADS1115 16-bit ADC over I2C ($7.8\text{ }\mu\text{V}$ LSB resolution, eliminating ESP8266 10-bit noisy SAR ADC).
-  - Dallas 1-Wire bus with $4.7\text{ k}\Omega$ pull-up resistor.
-  - $2.2\text{ k}\Omega + 3.3\text{ k}\Omega$ resistive voltage divider stepping $5\text{V}$ flow pulses cleanly to $3.0\text{V}$.
-- **Block 3: Edge Processing Core (NodeMCU ESP8266)**
-  - Bare-metal non-blocking cooperative execution loop.
-  - $25\text{°C}$ mathematical temperature normalization formula ($f_{comp} = 1.0 + 0.02(T - 25)$).
-  - 7-day linear least-squares drift compensation engine.
-  - 4-tier health verdict state machine (Level 0: Safe to Level 3: Severe).
-- **Block 4: Multi-Channel Annunciation & HMI**
+## SLIDE 4: PROPOSED SYSTEM / HIGH-LEVEL OVERVIEW
+- **Slide Title:** Proposed System: End-to-End Edge Architecture
+- **Slide Subtitle:** 4-Stage Autonomous Pipeline: Ingest, Condition, Process, and Annunciate
+- **Layout:** Horizontal 4-Stage Process Flow Pipeline with metric badges.
+- **Stage 1: Sensing Subsystem**
+  - Submersible dual-titanium TDS probe (ionic conduction).
+  - DS18B20 stainless-steel waterproof temperature probe.
+  - YF-S201 1/2" inline Hall-effect turbine.
+- **Stage 2: Hardware Signal Conditioning**
+  - ADS1115 16-bit ADC over I2C (eliminates ESP8266's noisy 10-bit SAR ADC).
+  - 1-Wire bus with $4.7\text{ k}\Omega$ pull-up resistor on Pin `D6`.
+  - Precision $2.2\text{ k}\Omega + 3.3\text{ k}\Omega$ resistive voltage divider (5.0V $\rightarrow$ 3.0V logic on `D5`).
+- **Stage 3: Firmware Edge Processing (NodeMCU ESP8266)**
+  - Non-blocking cooperative multitasking loop (Zero delay halts).
+  - $25\text{°C}$ thermal normalization formula: $f_{comp} = 1.0 + 0.02(T - 25)$.
+  - 7-day rolling least-squares baseline drift correction engine (`drift_compensation.cpp`).
+  - 4-tier anomaly fingerprinting state machine.
+- **Stage 4: Autonomous Dual-Layer Annunciation**
+  - Sub-85 ms local acoustic (Buzzer) and optical (Red LED) emergency alerts.
   - Local SSD1306 $128 \times 64$ OLED display.
-  - Discrete Red Alert LED + Active Piezo Buzzer alarm patterns.
-  - Offline Standalone SoftAP Web Dashboard (`PaaniGuard-Setup` at `192.168.4.1`).
-- **Oral Defense Script:**
-  > *"PaaniGuard follows a clean 4-stage pipeline: acquisition, conditioning, edge analytics, and dual-layer annunciation. By offloading analog conversion to a 16-bit external ADC and conditioning sensor signals with precision passive networks, the ESP8266 receives clean, noise-free telemetry, allowing our firmware algorithms to make deterministic health decisions in real time."*
+  - Standalone SoftAP web dashboard with embedded SVG telemetry graphs (`192.168.4.1`).
+- **Speaker Script:**
+  > *"PaaniGuard operates as a self-contained 4-stage pipeline. Physical sensors ingest water parameters; passive resistor conditioning and a 16-bit ADC eliminate noise; the ESP8266 executes non-blocking temperature normalization and least-squares drift compensation; and dual-layer annunciation notifies the user locally via buzzer, LED, OLED, and an offline web portal."*
+
+### DIAGRAM GENERATION PROMPT (SLIDE 4):
+> **Claude Artifact / SVG Prompt for System Pipeline:**
+> *"Generate a clean, modern, horizontal 4-stage technical pipeline diagram in SVG. Four connected chevron cards on a dark slate background (#0f172a): Card 1 (Navy Blue): '1. SENSING LAYER' listing Titanium TDS, DS18B20 Temp, YF-S201 Flow. Card 2 (Cyan): '2. HARDWARE CONDITIONING' showing ADS1115 16-Bit ADC, 4.7k Pull-up, 2.2k/3.3k Divider. Card 3 (Purple): '3. EDGE CORE (NodeMCU)' showing 80MHz L106, 25C Normalization, Least-Squares Drift Engine. Card 4 (Emerald Green): '4. ANNUNCIATION & HMI' showing OLED 0x3C, Buzzer + LED (<85ms), and Offline SoftAP (192.168.4.1). Crisp vector typography, arrow connectors between stages, and IEEE standard color highlights."*
 
 ---
 
-### SLIDE 5: SYSTEM BLOCK DIAGRAM
-- **Slide Layout:** Full-Slide Engineering Block Diagram (Rendered cleanly using the provided TikZ/Mermaid structure).
-- **Diagram Contents:**
-  - **Central Core:** NodeMCU v2 ESP8266-12E (80 MHz Tensilica L106, 3.3V AMS1117 LDO).
-  - **Power Rail:** 5.0V USB Input $\rightarrow$ `VU` (Direct 5V to Flow Sensor & TDS Module); `3V3` (Regulated 3.3V to ADS1115, OLED, DS18B20, Actuators).
-  - **Inputs (Left):**
-    - TDS Probe $\rightarrow$ ADS1115 ADC (Channel A0) $\rightarrow$ I2C (Pin D1 SCL / Pin D2 SDA).
-    - DS18B20 Temp Probe $\rightarrow$ Pin D6 (1-Wire, $4.7\text{ k}\Omega$ pull-up to 3.3V).
-    - YF-S201 Flow Sensor (5V Pulses) $\rightarrow$ Voltage Divider ($2.2\text{k}/3.3\text{k}$) $\rightarrow$ Pin D5 (GPIO 14, 3.0V Logic).
-  - **Outputs (Right):**
-    - SSD1306 OLED $\rightarrow$ I2C (Pin D1 SCL / Pin D2 SDA, Address `0x3C`).
-    - Red Alert LED $\rightarrow$ Pin D4 (GPIO 2, $330\,\Omega$ series resistor).
-    - Active Buzzer $\rightarrow$ Pin D0 (GPIO 16).
-  - **Wireless / Telemetry (Bottom):**
-    - 2.4 GHz RF $\rightarrow$ Standalone SoftAP Captive Portal (`192.168.4.1`, SSID: `PaaniGuard-Setup`).
-- **Oral Defense Script:**
-  > *"As shown in our block diagram, every voltage boundary is strictly controlled. The flow sensor runs on 5V USB power for reliable Hall-effect switching, but passes through an exact 2.2k/3.3k divider to present safe 3.0V pulses to GPIO 14. The I2C bus is shared between the ADS1115 at 0x48 and the OLED at 0x3C without conflicting, thanks to their dedicated hardware addresses."*
+## SLIDE 5: SYSTEM BLOCK DIAGRAM
+- **Slide Title:** Comprehensive Hardware System Block Diagram
+- **Slide Subtitle:** Interfacing Topology, Power Rail Distribution & Logical Buses
+- **Layout:** Centered schematic block diagram with distinct color-coded electrical buses (5V USB Red, 3.3V Orange, I2C Blue, Digital Green).
+- **Core Interconnections Highlighted:**
+  - **Power Rails:** Standard 5V USB $\rightarrow$ NodeMCU `VU` pin powering Flow Sensor and TDS Module; onboard AMS1117 LDO regulates 3.3V to ADS1115, OLED, DS18B20, and Actuators.
+  - **I2C Bus (Shared):** Pin `D1` (SCL) and Pin `D2` (SDA) routing concurrently to ADS1115 (`0x48`) and SSD1306 OLED (`0x3C`).
+  - **1-Wire Bus:** Pin `D6` (GPIO 12) tied to DS18B20 Data with $4.7\text{ k}\Omega$ pull-up across Row 11 (3.3V) and Row 12 (`D6`).
+  - **Flow Interrupt:** Pin `D5` (GPIO 14) connected to center node of $2.2\text{k}/3.3\text{k}$ divider (Row 21) receiving safe 3.0V pulses.
+  - **Wireless:** Integrated 2.4 GHz SoftAP (`PaaniGuard-Setup`) hosting captive portal at `192.168.4.1`.
+- **Speaker Script:**
+  > *"Notice how our block diagram enforces strict electrical isolation. The flow turbine requires 5V USB power to trigger its Hall element, but its pulses are stepped down through a 2.2k/3.3k divider to present exactly 3.0V to GPIO 14. The ADS1115 and OLED share the same I2C bus lines on D1 and D2 without conflict, thanks to hardware address decoding."*
+
+### DIAGRAM GENERATION PROMPTS (SLIDE 5):
+> **Option A — Mermaid.js Code:**
+> ```mermaid
+> flowchart TD
+>     USB[5V Micro-USB Host] -->|5.0V Raw| MCU[NodeMCU v2 ESP8266-12E\n80MHz Tensilica / 3.3V AMS1117]
+>     
+>     subgraph PowerRails [Power Distribution]
+>         MCU -->|5.0V VU Pin| VU_Rail[5.0V Bus: TDS Module & Flow Sensor]
+>         MCU -->|3.3V Regulated| V33_Rail[3.3V Bus: ADS1115, OLED, DS18B20]
+>     end
+>     
+>     subgraph Inputs [Input Conditioning Layer]
+>         TDS[Submersible TDS Probe] -->|Analog 0-2.3V| ADS[ADS1115 16-Bit ADC @ 0x48]
+>         ADS -->|I2C: D1 SCL / D2 SDA| MCU
+>         TEMP[DS18B20 Temp Probe] -->|1-Wire: Pin D6 + 4.7k Pullup| MCU
+>         FLOW[YF-S201 Flow Turbine] -->|5V Pulse| DIV[Divider: 2.2k / 3.3k -> 3.0V]
+>         DIV -->|Interrupt: Pin D5| MCU
+>     end
+>     
+>     subgraph Outputs [Actuation & Local Display]
+>         MCU -->|I2C: D1 SCL / D2 SDA| OLED[SSD1306 0.96 OLED @ 0x3C]
+>         MCU -->|GPIO D4 + 330R| LED[Red Alert LED]
+>         MCU -->|GPIO D0| BUZZ[Active Piezo Buzzer]
+>     end
+>     
+>     subgraph OfflineNet [Offline Local Telemetry]
+>         MCU -.->|2.4 GHz SoftAP| WEB[Standalone Captive Portal\nhttp://192.168.4.1\nSSID: PaaniGuard-Setup]
+>     end
+> ```
+>
+> **Option B — AI Image Generator (Midjourney / DALL-E) Prompt:**
+> *"An ultra-clean, modern engineering block diagram of an IoT water monitoring system named 'PaaniGuard'. Centered is a purple rectangular block representing a NodeMCU ESP8266-12E microcontroller. On the left are three input blocks: a TDS probe connecting to an ADS1115 16-bit ADC, a DS18B20 temperature probe with a 4.7k pull-up resistor, and a flow turbine feeding a 2.2k/3.3k voltage divider. On the right are output blocks: an OLED screen, a red alert LED with a 330-ohm resistor, and an active buzzer. Below is a dashed teal wireless block representing an offline SoftAP dashboard at 192.168.4.1. Clean white background, crisp vector lines, standard IEEE schematic styling, distinct voltage annotations."*
 
 ---
 
-### SLIDE 6: HARDWARE COMPONENTS & BILL OF MATERIALS (BOM)
-- **Slide Layout:** Structured Table with Bold Total & Sunk Cost Transparency Box.
-- **Component Breakdown Table:**
+## SLIDE 6: HARDWARE COMPONENTS & BILL OF MATERIALS (BOM)
+- **Slide Title:** Bill of Materials (BOM) & Cost Efficiency
+- **Slide Subtitle:** Total Production Budget Locked to ₹1,900.00 INR (~$22.89 USD)
+- **Layout:** High-density, professional accounting table with sourcing channels, unit costs, and commercial comparison callout.
+- **The BOM Table:**
 
-| Component Description | Technical Specifications | Sourcing Channel | Qty | Unit Cost (₹) | Unit Cost ($) |
-| :--- | :--- | :--- | :---: | :---: | :---: |
-| **NodeMCU v2 ESP8266-12E** | 80 MHz, 80KB SRAM, 4MB Flash, Wi-Fi | Robu.in / Online | 1 | ₹250.00 | $3.01 |
-| **ADS1115 16-Bit ADC** | 4-channel Sigma-Delta, I2C (`0x48`), PGA | Robu.in / Online | 1 | ₹180.00 | $2.17 |
-| **SSD1306 0.96" OLED** | $128 \times 64$ monochrome I2C (`0x3C`) | Robu.in / Online | 1 | ₹180.00 | $2.17 |
-| **Analog TDS Sensor Module** | Dual titanium probe, $0-1000\text{ ppm}$ | Robu.in / Online | 1 | ₹300.00 | $3.61 |
-| **YF-S201 Flow Sensor** | Hall-effect turbine, $1-30\text{ L/min}$, $450\text{ p/L}$ | Robu.in / Online | 1 | ₹300.00 | $3.61 |
-| **DS18B20 Temp Probe** | Waterproof stainless tube, $\pm0.5\text{°C}$ | Robu.in / Online | 1 | ₹120.00 | $1.45 |
-| **Buzzer + Red Alert LED** | Active 2.5kHz Piezo + $330\text{ }\Omega$ series LED | Broadway Ernakulam | 1 set | ₹60.00 | $0.72 |
-| **Breadboard + Resistors + Box** | 830-pt hub + $4.7\text{k}/2.2\text{k}/3.3\text{k}$ + Enclosure | Broadway Ernakulam | 1 set | ₹330.00 | $3.98 |
-| **Micro-USB Cable + Cal. Buffer** | Power cable + 342 ppm NaCl standard sol. | Local / Chem Supply | 1 set | ₹180.00 | $2.17 |
-| **TOTAL PROTOTYPE COST** | **Fully Functional Bench Model** | | | **₹1,900.00** | **$22.89** |
+| Component Identifier | Technical Specifications | Sourcing Channel | Qty | Unit Cost (₹) | Unit Cost ($) | Total (₹) |
+| :--- | :--- | :--- | :---: | :---: | :---: | :---: |
+| **NodeMCU v2 ESP8266** | 80 MHz Tensilica, 80KB SRAM, 4MB Flash | Robu.in / Online | 1 | ₹250.00 | $3.01 | ₹250.00 |
+| **ADS1115 16-Bit ADC** | 4-channel Sigma-Delta, I2C (`0x48`), PGA | Robu.in / Online | 1 | ₹180.00 | $2.17 | ₹180.00 |
+| **SSD1306 0.96" OLED** | $128 \times 64$ monochrome I2C (`0x3C`) | Robu.in / Online | 1 | ₹180.00 | $2.17 | ₹180.00 |
+| **Analog TDS Module** | Submersible titanium probe, $0-1000\text{ ppm}$ | Robu.in / Online | 1 | ₹300.00 | $3.61 | ₹300.00 |
+| **YF-S201 Flow Sensor** | Hall-effect turbine, $1-30\text{ L/min}$, $450\text{ p/L}$ | Robu.in / Online | 1 | ₹300.00 | $3.61 | ₹300.00 |
+| **DS18B20 Temp Probe** | Waterproof stainless tube, $\pm0.5\text{°C}$ | Robu.in / Online | 1 | ₹120.00 | $1.45 | ₹120.00 |
+| **Buzzer + Red Alert LED** | Active 2.5kHz Piezo + $330\text{ }\Omega$ series LED | Broadway Ernakulam | 1 set | ₹60.00 | $0.72 | ₹60.00 |
+| **Breadboard + Resistors** | 830-pt hub + $4.7\text{k}/2.2\text{k}/3.3\text{k}$ + Enclosure | Broadway Ernakulam | 1 set | ₹330.00 | $3.98 | ₹330.00 |
+| **Micro-USB + Cal. Buffer** | Power cable + 342 ppm NaCl standard sol. | Local / Chem Supply | 1 set | ₹180.00 | $2.17 | ₹180.00 |
+| **TOTAL PROTOTYPE COST** | **Fully Functional Bench Model** | | | **₹1,900.00** | **$22.89** | **₹1,900.00** |
 
-- **Bottom Highlight Box:** 
-  - Commercial alternative (Hach / Waterdrop): **$180 – $350 (₹15,000 – ₹29,000)**.
-  - PaaniGuard delivers an **88.5% cost reduction** while providing open-source data ownership.
+- **Bottom Comparison Banner:**
+  - Commercial Multi-Sensor Smart Monitor: **$180 – $350 (₹15,000 – ₹29,000)**.
+  - PaaniGuard delivers an **88.5% cost reduction** while ensuring complete data privacy and open-source sovereignty.
+- **Speaker Script:**
+  > *"Our total development cost is exactly ₹1,900. By sourcing standard industrial breakout modules and conditioning them with discrete resistor networks, PaaniGuard delivers research-grade telemetry at less than 12% of the cost of commercial consumer monitors like Waterdrop."*
 
 ---
 
-### SLIDE 7: CIRCUIT DIAGRAM & PHYSICAL BENCH TOPOLOGY
-- **Slide Layout:** 2-Column Split (Left: Pin Interconnection Matrix; Right: Physical Chassis Hub Architecture).
-- **Column 1: Complete Wiring Interconnection Matrix**
-  - `VU (5.0V)`: Raw USB power bus $\rightarrow$ Powers Flow Sensor Red lead & TDS Module.
+## SLIDE 7: CIRCUIT SCHEMATIC & PHYSICAL BENCH TOPOLOGY
+- **Slide Title:** Circuit Interconnections & Physical Hub Topology
+- **Slide Subtitle:** Single-Breadboard Passive Matrix & Off-Board Elevated MCU Architecture
+- **Layout:** 2-Column Split (Left: Complete Pin Interconnection Matrix; Right: Enclosure Hub Architecture Card).
+- **Column 1: Complete Pin Interconnection Matrix**
+  - `VU (5.0V)`: Raw USB power bus $\rightarrow$ Flow Sensor Red lead & TDS Module.
   - `3V3 (3.3V)`: Regulated rail $\rightarrow$ ADS1115 VDD, OLED VCC, DS18B20 VDD, $4.7\text{k}\Omega$ pull-up.
-  - `GND (0.0V)`: Common ground reference across all modules.
+  - `GND (0.0V)`: Common ground reference across all components.
   - `D1 (GPIO 5, SCL)`: Hardware I2C Clock shared by ADS1115 and OLED.
   - `D2 (GPIO 4, SDA)`: Hardware I2C Data shared by ADS1115 and OLED.
-  - `D5 (GPIO 14)`: Flow pulse interrupt input (jumpered to divider center node Row 21).
+  - `D5 (GPIO 14)`: Flow interrupt pulse (jumpered to divider center node Row 21).
   - `D6 (GPIO 12)`: 1-Wire thermal bus (jumpered to pull-up node Row 12).
-  - `D4 (GPIO 2)`: Red Alert LED anode via $330\,\Omega$ resistor.
-  - `D0 (GPIO 16)`: Active Buzzer control.
-- **Column 2: Physical Layout & Off-Board Hub Architecture**
-  - **Single 830-Point Breadboard Central Hub:** Used strictly as a passive distribution matrix (power rails, I2C bus, flow divider cluster Rows 20–22, 1-wire cluster Rows 10–12).
-  - **Elevated Off-Board NodeMCU:** Suspended along the enclosure sidewall ("flowing outside" the breadboard) via flexible flying Dupont leads.
-  - **Engineering Rationales:** 
-    1. Prevents mechanical vibration from the flow turbine shaking the MCU.
-    2. Isolates Wi-Fi RF radiation from high-impedance analog lines.
-    3. Prevents AMS1117 regulator thermal dissipation from heating the breadboard plastic.
-- **Oral Defense Script:**
-  > *"Notice our physical layout: rather than cramming the NodeMCU onto the breadboard where regulator heat and Wi-Fi RF emissions couple into the analog pins, we mounted the MCU off-board along the enclosure sidewall. The single 830-point breadboard acts purely as a passive routing matrix for power distribution, I2C lines, and discrete resistor networks."*
+  - `D4 (GPIO 2)`: Red Alert LED anode via $330\,\Omega$ series resistor.
+  - `D0 (GPIO 16)`: Active Buzzer drive.
+- **Column 2: Physical Hub Architecture**
+  - **Single 830-Point Breadboard Hub:** Strictly a passive distribution matrix (power rails, I2C bus, flow divider Rows 20–22, 1-wire cluster Rows 10–12).
+  - **Elevated Off-Board MCU Mounting:** The NodeMCU is suspended along the prototype enclosure sidewall ("flowing outside" the breadboard) via flexible flying Dupont leads.
+  - **Engineering Rationale:**
+    1. Isolates sensitive analog ADC lines from Wi-Fi RF power amplifier bursts.
+    2. Prevents AMS1117 regulator thermal dissipation from heating the breadboard plastic.
+    3. Eliminates mechanical vibration coupling from the flow turbine.
+- **Speaker Script:**
+  > *"Notice our physical layout: rather than plugging the NodeMCU into the breadboard where regulator heat and Wi-Fi bursts would induce thermal drift and RF noise on analog traces, we mounted the MCU off-board along the enclosure sidewall. The single 830-point breadboard acts purely as a passive distribution matrix for power, I2C routing, and discrete resistor networks."*
+
+### DIAGRAM GENERATION PROMPT (SLIDE 7):
+> **Claude Artifact / SVG Schematic Generation Prompt:**
+> *"Generate an electronic breadboard layout diagram in SVG. Show a single white 830-point breadboard serving as a passive hub inside a prototype box. Show the NodeMCU ESP8266 mounted vertically along the left sidewall outside the breadboard, connected via colorful flying jumper wires: Red wire to 5V VU rail, Orange wire to 3.3V rail, Black wire to GND rail, Green/Blue wires to I2C rows. On the breadboard, show: Rows 10-12 with a 4.7k pull-up resistor for DS18B20; Rows 20-22 with a 2.2k and 3.3k resistor voltage divider for Flow; a small 0.96 OLED screen plugged into I2C header rows; and a Red LED with 330-ohm resistor. Clear labeled pins, crisp technical rendering, professional Fritzing-style illustration."*
 
 ---
 
-### SLIDE 8: SOFTWARE & FIRMWARE ARCHITECTURE
-- **Slide Layout:** 3 Feature Columns (Firmware Core, Drift Algorithm, Resource Footprint).
-- **Column 1: Bare-Metal Non-Blocking Execution**
-  - Written in C++ for the Arduino Core for ESP8266 (`v3.0.2`+).
-  - Non-blocking cooperative multitasking: DS18B20 conversion runs asynchronously (`setWaitForConversion(false)`) so the 750 ms thermal conversion never blocks flow counting or web requests.
-  - `IRAM_ATTR flowISR()`: Flow turbine interrupt handler anchored directly in instruction RAM for sub-microsecond pulse capture.
+## SLIDE 8: SOFTWARE & FIRMWARE ARCHITECTURE
+- **Slide Title:** Software Architecture & Mathematical Drift Engine
+- **Slide Subtitle:** Bare-Metal Non-Blocking Loop, Linear Least-Squares Regression & Memory Footprint
+- **Layout:** 3 Feature Columns (Firmware Scheduling, Least-Squares Drift Math, Resource Footprint).
+- **Column 1: Non-Blocking Bare-Metal Loop**
+  - Written in modern C++ via `arduino-cli` on ESP8266 Core `v3.0.2`+.
+  - `IRAM_ATTR flowISR()`: Flow turbine pulse counting anchored in Instruction RAM for sub-microsecond latency.
+  - Asynchronous 1-Wire polling (`setWaitForConversion(false)`): DS18B20 750 ms conversion delay never halts flow counting or HTTP client requests.
 - **Column 2: Mathematical Drift Compensation Engine**
-  - Executes ordinary linear least-squares regression over LittleFS calibration checkpoints:
-    $$m = \frac{N \sum (t_i \cdot TDS_i) - \sum t_i \sum TDS_i}{N \sum (t_i^2) - (\sum t_i)^2}$$
-  - Corrects baseline shift at runtime: $TDS_{corrected} = TDS_{temp\_comp} - (m \cdot t + b - TDS_{ref})$.
-  - **Autonomous Recalibration Self-Flagging:** If drift exceeds 15%, the system asserts `driftExceeded = true` and updates the HMI to *"Recalibration Required"*, preventing deceptive output.
+  - Closes the *Nature 2026* gap via ordinary least-squares regression over LittleFS checkpoints:
+    $$\text{Slope } m = \frac{N \sum (t_i \cdot \Delta TDS_i) - \sum t_i \sum \Delta TDS_i}{N \sum (t_i^2) - (\sum t_i)^2}$$
+  - Runtime correction: $TDS_{corrected} = TDS_{temp\_comp} - (m \cdot t + b)$.
+  - **Autonomous Recalibration Self-Flagging:** When drift exceeds the 15.0% correctable band (`DRIFT_MAX_CORRECTABLE_PERCENT`), the firmware asserts `driftExceeded = true` and updates the HMI to *"Recalibration Required"*.
 - **Column 3: Production Memory Footprint**
-  - **SRAM (Heap / Data):** $33.4\text{ KB} / 80.2\text{ KB}$ (**41.7% utilized** — 46.8 KB free headroom).
-  - **IRAM (Interrupt Space):** $61.5\text{ KB} / 65.5\text{ KB}$ (**93.8% utilized**).
-  - **Flash Code Memory:** $359.7\text{ KB} / 1048.6\text{ KB}$ (**34.3% utilized**).
-- **Oral Defense Script:**
-  > *"Our firmware contains zero blocking `delay()` calls. Even the 750-millisecond temperature read is handled through non-blocking timer polling. The drift compensation algorithm runs linear regression in closed-form arithmetic, taking less than 1.4 milliseconds of CPU time, and stores its checkpoints in non-volatile LittleFS flash so calibration survives power cycles."*
+  - **RAM (Global / BSS / Heap):** $33.4\text{ KB} / 80.2\text{ KB}$ (**41.7% utilized** — 46.8 KB free headroom).
+  - **IRAM (Interrupt Cache):** $61.5\text{ KB} / 65.5\text{ KB}$ (**93.8% utilized**).
+  - **Flash Code Memory (IROM):** $359.7\text{ KB} / 1.05\text{ MB}$ (**34.3% utilized**).
+- **Speaker Script:**
+  > *"Our firmware contains zero blocking delay calls. The least-squares regression executes in closed-form arithmetic taking less than 1.4 milliseconds of CPU time. Checkpoints are persisted across reboots using the LittleFS flash file system. If electrode fouling drives drift past 15%, the system refuses to report false numbers and alerts the user to clean the probe."*
+
+### DIAGRAM GENERATION PROMPT (SLIDE 8):
+> **Mermaid.js Flowchart Code:**
+> ```mermaid
+> flowchart TD
+>     PowerOn([Power On / Reset]) --> InitSensors[Init GPIO, I2C ADS1115/OLED, Dallas 1-Wire]
+>     InitSensors --> LoadFS[Mount LittleFS: Load Calibration Checkpoints]
+>     LoadFS --> SoftAP[Launch SoftAP: PaaniGuard-Setup @ 192.168.4.1]
+>     
+>     SoftAP --> ExecLoop([Main Cooperative Loop])
+>     
+>     ExecLoop --> ReadSensors[Sample TDS Voltage on A0 & Read DS18B20 Temp]
+>     ReadSensors --> NormTemp[Apply 25°C Thermal Normalization: f_comp = 1 + 0.02*ΔT]
+>     NormTemp --> DriftFit[Apply Least-Squares Baseline Drift Correction]
+>     
+>     DriftFit --> CheckThreshold{Drift > 15%?}
+>     CheckThreshold -- Yes --> FlagRecal[Assert driftExceeded = true: Alert Recalibration]
+>     CheckThreshold -- No --> Classify[4-Tier Anomaly Fingerprinting State Machine]
+>     
+>     FlagRecal --> Classify
+>     
+>     Classify --> Dispatch[Update OLED Display + LED/Buzzer Timing Patterns]
+>     Dispatch --> WebHandle[Handle HTTP Web Requests & DNS Queries]
+>     WebHandle --> ExecLoop
+> ```
 
 ---
 
-### SLIDE 9: WORKING PROTOTYPE, DEBUGGING CHRONICLES & RESULTS
-- **Slide Layout:** Split View (Left: The 7 Overcome Hardware Failures; Right: Bench Test Validation Data).
-- **The 7 Physical Debugging Chronicles (Overcoming Real Hardware Failures):**
-  1. *AMS1117 Short-Circuit & Melted Rail:* Accidental $5\text{V} \rightarrow \text{GND}$ bridge during divider wiring; fixed by row separation and pin verification.
-  2. *Floating 190 ppm Ghost Bug:* Test code read channel A1 instead of A0; fixed by setting `ADS1115_CHANNEL_TDS = 0`.
-  3. *TDS Black Shipping Cap:* Factory rubber shipping cap blinded probe; removed cap, verified jump from 0 ppm to 1224 ppm in saline.
-  4. *I2C SCL Clamped to 0V:* ADS1115 internal ESD diode forward-biased due to unpowered VDD wire; rewired to 3V3, restoring bus to 3.29V.
-  5. *Analog LED vs. NeoPixel Bug:* Strobing 800 kHz bitstream sent to analog LED; eliminated library, implemented direct `digitalWrite` with $330\,\Omega$ resistor.
-  6. *Flow Sensor VIN vs. VU Starvation:* Flow sensor wired to `VIN` (0V on USB power); moved to `VU` (5.0V), verified 1,000 pulses.
-  7. *DS18B20 Floating -127°C Bug:* Missing pull-up resistor; placed $4.7\text{ k}\Omega$ resistor between Row 11 (3.3V) and Row 12 (D6), achieving live 29.0°C.
-- **Experimental Bench Results:**
-  - **7-Day Drift Validation:** Uncorrected error grew to +39.3% (476 ppm); PaaniGuard algorithm maintained error **$<1.2\%$** (344 ppm) before safely asserting recalibration flag.
-  - **Contamination Spike Test:** Instantaneous jump from $55\text{ ppm} \rightarrow 1,224\text{ ppm}$ in $<85\text{ ms}$, triggering Level 3 "DO NOT USE" alert.
-  - **Router-Off SoftAP Test:** Local dashboard at `192.168.4.1` loaded in **$<1.2\text{ seconds}$** with zero internet connection.
-  - **Flow Metering Test:** 1,000 pulse continuous trial logged exactly **$2.22\text{ Liters}$** at $9.39\text{ L/min}$.
-- **Oral Defense Script:**
-  > *"Every engineering prototype faces failures. We encountered 7 distinct physical and electrical failures—from forward-biased ESD clamping diodes locking the I2C bus, to a floating ADC channel picking up 190 ppm of electromagnetic noise. By systematically diagnosing each fault with digital multimeters and oscilloscope checks, we engineered permanent hardware and firmware remedies."*
+## SLIDE 9: WORKING PROTOTYPE, DEBUGGING CHRONICLES & BENCH RESULTS
+- **Slide Title:** Assembled Hardware Prototype & Experimental Bench Results
+- **Slide Subtitle:** Overcoming 7 Physical Hardware Failures & Empirical Verification
+- **Layout:** 2-Card Layout (Left: The 7 Overcome Hardware Failures; Right: Experimental Validation Data & Visual Placeholders).
+- **IMPORTANT NOTE:** **USER WILL INSERT REAL BENCH PHOTOGRAPHS & SIMULATION PLOT HERE.**
+  - *Photo Placement 1:* Prototype enclosure box showing elevated sidewall-mounted NodeMCU, central breadboard hub, glowing OLED, and test beaker.
+  - *Photo Placement 2:* High-resolution simulation plot (`drift_simulation_results.png`).
+- **Card 1: The 7 Overcome Hardware Failures (Physical Debugging Chronicle)**
+  1. *AMS1117 Short-Circuit & Melted Rail:* Accidental $5\text{V} \rightarrow \text{GND}$ short; diagnosed via thermal shutdown; solved by row re-mapping.
+  2. *Floating 190 ppm Ghost Bug:* Test code read channel A1 instead of A0; fixed by locking `ADS1115_CHANNEL_TDS = 0`.
+  3. *TDS Black Rubber Shipping Cap:* Factory seal blinded electrodes; removed cap, verified jump to 1224 ppm in saline.
+  4. *I2C SCL Clamped to 0V:* ADS1115 unpowered ESD clamping diode forward-biased; rewired $V_{DD}$ to clean 3.3V, restoring bus to 3.29V.
+  5. *Analog LED vs. NeoPixel Protocol:* Strobed 800 kHz bitstream fed to analog LED; eliminated library, implemented direct `digitalWrite` with $330\,\Omega$ resistor.
+  6. *Flow Sensor VIN vs. VU Starvation:* Flow sensor plugged into unpowered `VIN`; moved to `VU` (5.0V), successfully logging 1,000 pulses.
+  7. *DS18B20 Floating -127°C Bug:* Missing pull-up resistor; placed $4.7\text{ k}\Omega$ pull-up across 3.3V and `D6`, achieving live 29.0°C.
+- **Card 2: Objective Bench Validation Data**
+  - **Drift Compensation Simulation:** Modeled $0.8\text{ ppm/hr}$ drift ($19.2\text{ ppm/day}$) over 7 days in `simulate_drift.py`. Uncorrected drift climbed to $+38.9\%$ (475 ppm); PaaniGuard algorithm maintained residual error **$<0.3\%$** (341–342 ppm) before autonomously asserting `driftExceeded = True` on Day 3.
+  - **Saline Contamination Spike:** Instantaneous jump from $55\text{ ppm} \rightarrow 1,224\text{ ppm}$ in $<85\text{ ms}$, immediately triggering Level 3 "DO NOT USE" alarm.
+  - **Router-Off SoftAP Test:** Connected via smartphone to `192.168.4.1` with Wi-Fi router powered off; rendered full SVG telemetry dashboard in **$<1.2\text{ seconds}$**.
+  - **Flow Turbine Verification:** 1,000 continuous pulses registered exactly **$2.222\text{ Liters}$** at $9.39\text{ L/min}$.
+- **Speaker Script:**
+  > *"Every real embedded system faces hardware bugs. We documented and conquered 7 distinct physical failures—from forward-biased ESD diodes dragging our I2C clock to ground, to unpowered VIN pins starving our flow sensor. In bench testing, our software simulation proved that our drift algorithm holds error under 0.3%, while router-off emergency trials proved our captive portal dashboard loads in 1.2 seconds without any internet connection."*
 
 ---
 
-### SLIDE 10: ADVANTAGES & REAL-WORLD APPLICATIONS
-- **Slide Layout:** 2 Columns (Key Engineering Advantages vs. Real-World Deployment Scenarios).
+## SLIDE 10: ADVANTAGES & REAL-WORLD APPLICATIONS
+- **Slide Title:** Engineering Advantages & Practical Applications
+- **Slide Subtitle:** High Reliability, Offline Autonomy & Deployment in Vulnerable Water Systems
+- **Layout:** 2-Column Split (System Differentiators vs. Real-World Deployment Scenarios).
 - **Column 1: Key System Advantages**
-  - **Drift Resilience:** Closes the 24h electrochemical degradation gap without expensive industrial recalibration carts.
-  - **100% Offline Autonomy:** Zero reliance on AWS, ThingSpeak, or home routers; serves full graphical dashboard via captive portal.
-  - **Sub-85 ms Edge Protection:** Deterministic buzzer and LED alerts notify families immediately during contamination spikes.
-  - **Extreme Cost Efficiency:** Full system built for ₹1,900 ($23) vs. commercial systems costing >$180.
-- **Column 2: Practical Deployment Scenarios**
-  - **Domestic Overhead Water Tanks:** Continuous monitoring of municipal water vs. tanker supply quality and leakage tracking.
-  - **Rural Community Kiosks (Jal Jeevan Mission):** Off-grid water ATM testing stations providing immediate visual safety status to villagers.
-  - **Post-Disaster Flood Relief (Kerala Context):** Rapid deployment to flooded wells to detect bacterial and sewage ingress before consumption.
-  - **Institutional Monitoring:** School, hostel, and hospital tap water pipelines.
+  - **Electrochemical Drift Resilience:** Software-based least-squares correction eliminates the need for expensive daily laboratory recalibration.
+  - **100% Offline Autonomy:** Zero dependency on cloud servers (AWS/ThingSpeak) or home routers; operates reliably during grid and network outages.
+  - **Sub-85 ms Local Edge Protection:** Hardwired active buzzer and visual strobe immediately warn users before contaminated water is ingested.
+  - **Extreme Affordability:** Built for ₹1,900 ($22.89) vs. commercial monitors costing >$180.
+- **Column 2: Real-World Practical Applications**
+  - **Domestic Overhead Tanks (Kerala Context):** Continuous monitoring of municipal tap water vs. tanker supply quality; leak detection via flow metering.
+  - **Rural Community Kiosks (Jal Jeevan Mission):** Off-grid public water ATM safety stations providing instant visual indicators to villagers.
+  - **Post-Flood Disaster Relief:** Rapid deployment to flooded domestic wells to detect sewage ingress and mineral detachment.
+  - **Institutional Tap Networks:** Real-time water safety monitoring in schools, hostels, and hospitals.
+- **Speaker Script:**
+  > *"PaaniGuard solves the core vulnerability of modern IoT: cloud dependency. During monsoon floods or rural power cuts when water contamination is most lethal, cloud-connected monitors fail. PaaniGuard broadcasts its own offline portal directly to any smartphone, providing instant safety advisories when they matter most."*
+
+### DIAGRAM GENERATION PROMPT (SLIDE 10):
+> **Claude Artifact / SVG Infographic Prompt:**
+> *"Generate a modern vector infographic in SVG illustrating 4 real-world deployment scenarios for PaaniGuard. Four quadrants with clean outline icons and dark slate backdrop: Quadrant 1 (Top-Left): Domestic Overhead Tank showing rooftop tank with pipe sensor clamp; Quadrant 2 (Top-Right): Rural Community Well / Water Kiosk with Jal Jeevan Mission banner; Quadrant 3 (Bottom-Left): Post-Disaster Flood Zone showing flooded well and emergency smartphone telemetry; Quadrant 4 (Bottom-Right): Institutional Building (School/Hospital). Accent colors in Cyan (#00d2ff) and Emerald Green (#10b981). Crisp typography and professional layout."*
 
 ---
 
-### SLIDE 11: CURRENT LIMITATIONS & FUTURE UPGRADE ROADMAP
-- **Slide Layout:** 2-Card Contrast (Current Limitations vs. Engineering Roadmap).
-- **Card 1: Current Prototype Limitations**
-  - **Breadboard Mechanical Vulnerability:** Solderless spring contacts and Dupont jumper leads are susceptible to long-term oxidation and mechanical shock.
-  - **Advisory-Only Topology:** Lacks motorized shutoff capability due to the intentional exclusion of the solenoid valve.
-  - **Mains USB Power Dependency:** Requires standard 5V wall adapter power; lacks integrated solar battery backup.
-- **Card 2: Future Upgrade Roadmap**
-  - **Custom 2-Layer KiCad PCB:** Eliminate all breadboard wiring, implement dedicated ground planes, and reduce analog noise $<1\text{ mV}$.
-  - **Long-Range LoRaWAN Telemetry:** Integrate an SX1276 LoRa transceiver for 5–10 km transmission to Kerala Water Authority (KWA) / LSGD servers without cellular subscription fees.
-  - **On-Device TinyML Classification:** Deploy TensorFlow Lite for Microcontrollers on an ESP32 host to classify complex multi-sensor contamination signatures (distinguishing mineral scale from chemical toxins).
-  - **Solar Harvesting Power Pack:** Add a 5V 2W monocrystalline solar panel with TP4056 LiFePO4 battery management for perpetual off-grid operation.
+## SLIDE 11: CURRENT LIMITATIONS & FUTURE UPGRADE ROADMAP
+- **Slide Title:** Limitations & Future Engineering Roadmap
+- **Slide Subtitle:** From Bench Breadboard Prototype to Industrial-Grade Edge Instrument
+- **Layout:** 2 Comparative Cards (Current Prototype Constraints vs. Engineering Roadmap).
+- **Card 1: Current Limitations (Self-Identified Engineering Constraints)**
+  - **Breadboard Mechanical Vulnerability:** Solderless spring contacts and Dupont jumpers are prone to contact resistance and oxidation over long-term field deployment.
+  - **Simulation-Only Drift Validation:** Drift compensation is validated in Python simulation; multi-week hardware validation against physical reference solutions remains future work.
+  - **Advisory-Only Architecture:** Lacks physical shutoff capability due to the deliberate omission of the 12V solenoid valve.
+  - **Power Grid Dependency:** Relies on 5V USB wall power; lacks an integrated solar harvester or battery backup.
+- **Card 2: Future Engineering Roadmap**
+  - **Custom 2-Layer KiCad PCB:** Design a custom PCB with continuous ground planes and solder pads, eliminating jumper wires and reducing analog noise $<1\text{ mV}$.
+  - **LoRaWAN Long-Range Telemetry:** Integrate an SX1276 LoRa transceiver for 5–10 km transmission to Kerala Water Authority (KWA) / LSGD municipal gateways.
+  - **On-Device TinyML Anomaly Classification:** Port TensorFlow Lite for Microcontrollers to an ESP32 host to classify complex multi-variate water anomaly profiles.
+  - **Solar Harvesting Power Pack:** Integrate a 5V 2W monocrystalline solar panel with TP4056 LiFePO4 battery management for perpetual off-grid operation.
+- **Speaker Script:**
+  > *"We acknowledge our prototype's limits. Solderless breadboards are for bench verification, not permanent plumbing. Our roadmap transitions PaaniGuard onto a custom 2-layer PCB in KiCad and integrates long-range LoRaWAN telemetry to transmit data over 10 kilometers to municipal water boards without cellular data charges."*
+
+### DIAGRAM GENERATION PROMPT (SLIDE 11):
+> **Claude Artifact / SVG Architecture Roadmap Prompt:**
+> *"Generate a sleek engineering roadmap graphic in SVG showing PaaniGuard's transition from prototype to production. Left: 'Current Prototype' icon showing breadboard and USB cable. Horizontal progress arrow labeled 'Engineering Evolution'. Right: 3 futuristic upgrade cards: 1. 'Custom 2-Layer PCB' (KiCad schematic icon, ground plane shielding); 2. 'LoRaWAN Off-Grid Telemetry' (Radio antenna icon, 10km transmission to Kerala Water Authority); 3. 'TinyML Edge Classification' (Microchip icon with neural network nodes on ESP32). Modern dark technical theme with neon green and cyan accents."*
 
 ---
 
-### SLIDE 12: BIBLIOGRAPHY, REFERENCES & CONCLUSION
-- **Slide Layout:** References List (IEEE Format) + Concluding Impact Statement Box.
-- **Academic References (IEEE Format):**
-  1. **[1] M. A. Rahman, S. K. Roy, and P. K. Debnath,** *"An intelligent, low-cost water quality monitoring system with on-device machine learning and cloud integration,"* *Scientific Reports*, vol. 16, no. 1, Art. no. 37287, Feb. 2026, doi: `10.1038/s41598-026-37287-3`.
-  2. **[2] K. S. Kumar, R. Venkat, and N. S. Rao,** *"IoT-based system for real-time water quality monitoring and advanced turbidity and pH sensor calibration to improve accuracy and reliability using ThingSpeak,"* *IoT (MDPI)*, vol. 7, no. 2, Art. no. 42, May 2026, doi: `10.3390/iot7020042`.
+## SLIDE 12: REFERENCES & CONCLUSION
+- **Slide Title:** Academic References & Project Conclusion
+- **Slide Subtitle:** Formal IEEE Citations & Closing Engineering Summary
+- **Layout:** 2-Column Split (Left: Formal IEEE References; Right: Concluding Impact Card).
+- **Column 1: References (IEEE Format)**
+  1. **[1] S. Sharma, D. Mishra, A. Yadav, B. Gami, and E. S. Madhan,** *"An intelligent, low-cost water quality monitoring system with on-device machine learning and cloud integration,"* *Scientific Reports*, vol. 16, Art. no. 11106, Feb. 2026, doi: `10.1038/s41598-026-37287-3`.
+  2. **[2] M. Al Drees, A. E. Rahma, S. Daffalla, and R. Alsudais,** *"IoT-based system for real-time water quality monitoring and advanced turbidity and pH sensor calibration to improve accuracy and reliability using ThingSpeak,"* *IoT (MDPI)*, vol. 7, no. 2, Art. no. 42, May 2026, doi: `10.3390/iot7020042`.
   3. **[3] Bureau of Indian Standards,** *"Drinking Water — Specification (Second Revision of IS 10500),"* IS 10500:2012, New Delhi, India, May 2012.
   4. **[4] World Health Organization,** *"Guidelines for Drinking-water Quality: Fourth Edition,"* Geneva, WHO, 2022.
   5. **[5] Texas Instruments,** *"ADS111x Ultra-Small 16-Bit ADC with Reference,"* ADS1115 Datasheet, SBAS444D, 2018.
   6. **[6] Maxim Integrated,** *"DS18B20 Programmable Resolution 1-Wire Digital Thermometer,"* Datasheet 19-7487, 2019.
   7. **[7] Espressif Systems,** *"ESP8266EX Datasheet,"* Version 6.6, 2020.
-- **Concluding Impact Statement:**
-  > *"PaaniGuard demonstrates that high-precision, drift-compensated water quality anomaly detection does not require thousand-dollar industrial analyzers. By combining bare-metal edge computing on the ESP8266 with closed-form mathematical drift correction, an external 16-bit ADC, and an offline-first SoftAP web architecture, PaaniGuard delivers reliable, sovereign, and actionable water safety monitoring for just ₹1,900. Thank you. We are now open for questions."*
+- **Column 2: Concluding Engineering Impact**
+  > **"PaaniGuard demonstrates that high-precision, drift-compensated water quality anomaly detection does not require expensive industrial analyzers. By combining bare-metal edge computing on the ESP8266 with closed-form mathematical drift correction, an external 16-bit ADC, and an offline-first SoftAP web architecture, PaaniGuard delivers reliable, sovereign, and actionable water safety monitoring for just ₹1,900."**
+- **Speaker Script:**
+  > *"To conclude: PaaniGuard proves that high-precision water safety monitoring can be achieved at a fraction of commercial costs. By directly closing the unbuilt drift-compensation gap identified in Nature Scientific Reports and ensuring 100% offline autonomy, PaaniGuard provides a dependable, life-saving instrument for households and communities. Thank you. We welcome your questions."*
 
 ---
 
-# SECTION 3: EXAMINER ANTICIPATED Q&A & DEFENSE CHEAT SHEET
+## SECTION 4: EXAMINER ANTICIPATED VIVA Q&A DEFENSE CHEAT SHEET
 
-| Expected Examiner Question | Strategic Engineering Answer |
+| Examiner Trap Question | Strategic Defense Answer |
 | :--- | :--- |
-| **Q1: Why did you use NodeMCU ESP8266 instead of ESP32 or STM32?** | *"The ESP8266 costs only ₹250 ($3.01) and includes an integrated 802.11 b/g/n Wi-Fi radio, which allows us to host the standalone SoftAP dashboard without adding external network ICs. An STM32 would require an external Wi-Fi module like the ESP-01, increasing BOM cost and wiring complexity. Our firmware utilizes only 41.7% of the ESP8266's RAM and 34.3% of Flash, proving the processor is mathematically optimal without paying for an ESP32."* |
-| **Q2: Why use the ADS1115 instead of the ESP8266 onboard ADC (A0)?** | *"The ESP8266 onboard ADC is a 10-bit successive approximation register (SAR) ADC with significant non-linearity above 0.8V, high input noise from the Wi-Fi RF power amplifier, and a limited 0–1.0V input span. The ADS1115 provides 16-bit Sigma-Delta digitization ($7.8\text{ }\mu\text{V}$ LSB), an onboard programmable gain amplifier, and communicates over I2C, isolating delicate analog signals from the MCU's RF noise floor."* |
-| **Q3: How does your drift compensation work without daily user calibration?** | *"The algorithm uses linear least-squares regression over historical buffer checkpoints stored in LittleFS flash. Electrochemical electrode fouling exhibits predictable, monotonic linear drift over the first 7 days (~0.8 ppm/hour). By calculating the drift slope $m$, the firmware computes an offset $\Delta_{drift}(t)$ and subtracts it from temperature-normalized TDS. If total drift exceeds 15%, the firmware stops guessing and asserts `driftExceeded`, instructing the user to rinse the probe."* |
-| **Q4: Why did you drop the 12V Solenoid Valve?** | *"Two critical engineering reasons: First, rapid valve closure in pressurized piping induces hydraulic shock waves (water hammer) exceeding 10 bar, threatening domestic plumbing joints. Second, de-energizing an inductive 12V 500mA solenoid coil creates high-voltage flyback spikes ($>50\text{V}$) that couple into breadboard ground lines, causing MCU resets. We locked the system scope to deterministic alerting and advisory delivery."* |
-| **Q5: Why did you drop the analog pH sensor?** | *"Glass bulb pH electrodes suffer from bulb dehydration and potassium chloride junction fouling. In unmonitored tap water, cheap pH probes drift by $>1.5\text{ pH}$ within 2 to 3 weeks and require bi-weekly two-point calibration in pH 4.01 and pH 6.86 buffers. Claiming unmaintained long-term pH sensing on an edge device is unrealistic. TDS and temperature provide robust, long-term indicators of ionic contamination."* |
-| **Q6: Why is the NodeMCU mounted off the breadboard in your physical build?** | *"Our Case 1 debugging failure proved that breadboard power rails can overheat under accidental shorts. Furthermore, mounting the MCU off-board on the enclosure sidewall isolates Wi-Fi antenna emissions from the ADS1115 analog traces, prevents AMS1117 regulator heat from transferring to temperature-sensitive passives, and isolates the MCU from physical vibration when water rushes through the flow turbine."* |
+| **Q1: Why use NodeMCU ESP8266 instead of ESP32?** | *"The ESP8266 costs ₹250 ($3.01) and includes an integrated 802.11 b/g/n Wi-Fi radio, allowing us to host the standalone SoftAP dashboard without adding external network ICs. Our firmware uses only 41.7% RAM and 34.3% Flash, proving the ESP8266 is mathematically optimal without unnecessary ESP32 cost."* |
+| **Q2: Why use ADS1115 instead of the ESP8266 onboard ADC (A0)?** | *"The ESP8266 onboard ADC is a 10-bit SAR ADC with severe non-linearity above 0.8V and high RF noise from the Wi-Fi power amplifier. The ADS1115 provides 16-bit Sigma-Delta digitization ($7.8\text{ }\mu\text{V}$ LSB), an onboard programmable gain amplifier, and communicates over I2C, completely isolating analog signals from the MCU's RF noise floor."* |
+| **Q3: How does drift compensation work without daily physical recalibration?** | *"The algorithm executes linear least-squares regression over historical buffer checkpoints stored in LittleFS flash. Electrochemical electrode fouling exhibits predictable linear drift over the first 7 days (~0.8 ppm/hour). By calculating the drift slope $m$, the firmware computes an offset $\Delta_{drift}(t)$ and subtracts it from temperature-normalized TDS. If total drift exceeds 15%, the firmware asserts `driftExceeded`, instructing the user to clean the probe."* |
+| **Q4: Why did you omit the 12V Solenoid Valve?** | *"Rapid valve closure in pressurized piping induces hydraulic shock waves (water hammer) exceeding 10 bar, risking domestic plumbing joints. Additionally, de-energizing an inductive 12V 500mA solenoid coil creates high-voltage flyback spikes ($>50\text{V}$) that couple into breadboard ground lines, causing MCU resets. We locked the system scope to deterministic alerting and advisory delivery."* |
+| **Q5: Why did you omit the analog pH sensor?** | *"Glass bulb pH electrodes suffer from bulb dehydration and potassium chloride junction fouling. In unmonitored tap water, cheap pH probes drift by $>1.5\text{ pH}$ within 2 to 3 weeks and require bi-weekly two-point calibration in pH 4.01 and pH 6.86 buffers. Claiming unmaintained long-term pH sensing on an edge device is unrealistic. TDS and temperature provide robust, long-term indicators of ionic contamination."* |
+| **Q6: Why is the NodeMCU mounted off the breadboard?** | *"Mounting the MCU off-board along the enclosure sidewall isolates Wi-Fi antenna emissions from the ADS1115 analog traces, prevents AMS1117 regulator heat from transferring to temperature-sensitive passives, and isolates the MCU from physical vibration when water rushes through the flow turbine."* |
+```
