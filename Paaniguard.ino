@@ -19,13 +19,20 @@ Adafruit_ADS1115 ads;
 
 #define PIN_ALERT_LED  PIN_WS2812_LED // D4 (GPIO2) - Red alert LED
 
-// 1 = feed simulated TDS and flow (30 s cycle: normal, rising, check, do not
-// use, recovery). Everything downstream is the real code path: verdict, buzzer,
-// LED, OLED, web page, history. Set to 0 for real sensors.
+// Build variant. The default is the real build (real sensors). For the demo
+// build change the 0 below to 1 (or compile with -DDEMO_SENSOR_DATA=1); it
+// feeds simulated TDS, flow and temperature, 15 s each in turn: normal,
+// check your water, do not use. Everything downstream is the real code path
+// (verdict, buzzer, LED, OLED, web page, history). The demo ignores saved
+// calibration and never shows the join-WiFi screen, so photos are repeatable.
+#ifndef DEMO_SENSOR_DATA
 #define DEMO_SENSOR_DATA 0
-// -1 = cycle through all states. 0, 2 or 3 = hold that state (0 normal and
-// silent, 2 check your water, 3 do not use) so the demo can be paused.
+#endif
+// Demo only: -1 cycles through the three states; 0, 2 or 3 holds that state
+// (normal, check your water, do not use). Build with -DDEMO_HOLD_LEVEL=2 etc.
+#ifndef DEMO_HOLD_LEVEL
 #define DEMO_HOLD_LEVEL -1
+#endif
 
 bool oledOk = false;
 bool adsOk = false;
@@ -41,31 +48,19 @@ void IRAM_ATTR flowISR() {
 }
 
 #if DEMO_SENSOR_DATA
-// Simulated scenario. Six 5 s phases (30 s cycle), linearly interpolated between the
-// start and end value of each phase.
+// Simulated scenario: three states held for 15 s each (45 s cycle), so there is
+// time to photograph each one. Each state is steady apart from a small wobble.
 static void demoSample(float &ppm, float &lpm, float &tempC) {
-  tempC = 25.0 + 2.5 * sin(millis() / 3000.0);   // drifts around room temperature, visible within one cycle
+  tempC = 25.0 + 2.5 * sin(millis() / 3000.0);   // drifts around room temperature
+  static const float phasePpm[3] = {150, 640, 1180};   // normal, check, do not use
+  static const float phaseLpm[3] = {2.4, 1.8, 0.0};
+  const unsigned long PHASE_MS = 15000;
+  int p = (millis() % (3 * PHASE_MS)) / PHASE_MS;
 #if DEMO_HOLD_LEVEL >= 0
-  {
-    static const float holdPpm[4] = {150, 150, 640, 1180};
-    static const float holdLpm[4] = {2.4, 2.4, 1.8, 0.0};
-    ppm = holdPpm[DEMO_HOLD_LEVEL] + sin(millis() / 700.0) * 4.0;
-    lpm = holdLpm[DEMO_HOLD_LEVEL];
-    return;
-  }
+  p = (DEMO_HOLD_LEVEL == 0) ? 0 : (DEMO_HOLD_LEVEL == 2) ? 1 : 2;
 #endif
-  static const float ppmA[6] = {150, 160, 640, 700, 1180, 1100};
-  static const float ppmB[6] = {160, 640, 700, 1180, 1100, 150};
-  static const float lpmA[6] = {2.4, 2.4, 2.2, 1.8, 0.0, 0.0};
-  static const float lpmB[6] = {2.4, 2.2, 1.8, 0.0, 0.0, 2.4};
-  const unsigned long PHASE_MS = 5000;
-  unsigned long t = millis() % (6 * PHASE_MS);
-  int p = t / PHASE_MS;
-  float f = (t % PHASE_MS) / (float)PHASE_MS;
-  ppm = ppmA[p] + (ppmB[p] - ppmA[p]) * f + sin(millis() / 700.0) * 4.0;
-  lpm = lpmA[p] + (lpmB[p] - lpmA[p]) * f;
-  if (ppm < 0) ppm = 0;
-  if (lpm < 0.02) lpm = 0;
+  ppm = phasePpm[p] + sin(millis() / 700.0) * 4.0;
+  lpm = phaseLpm[p];
 }
 
 // Inverse of the TDS polynomial in loop() (monotonic for v >= 0), so the
@@ -293,7 +288,7 @@ void loop() {
   float rawTdsPpm = tdsPpm;
   if (tempOk) tdsPpm = drift_applyTemperatureCompensation(rawTdsPpm, tempC);
   float tdsTempComp = tdsPpm;   // what a calibration checkpoint must record
-  if (tdsReady) {
+  if (tdsReady && !DEMO_SENSOR_DATA) {   // the demo ignores saved calibration
     tdsPpm = drift_applyBaselineCorrection(tdsTempComp);
     if (tdsPpm < 0) tdsPpm = 0;
   }
@@ -313,7 +308,7 @@ void loop() {
 
   // One verdict drives the beeper, LED, OLED and the web page, so they always agree.
   // level: 0 normal, 1 watch, 2 check your water, 3 do not use.
-  FingerprintResult fp = fingerprint_evaluate(7.0, tdsPpm, drift_needsRecalibration());
+  FingerprintResult fp = fingerprint_evaluate(7.0, tdsPpm, !DEMO_SENSOR_DATA && drift_needsRecalibration());
   int level = (int)fp.severity;
 
   // Compute flow rate every 500ms
@@ -334,9 +329,10 @@ void loop() {
   // LED and buzzer are driven by alertOutputs() in the wait loop below, so
   // their patterns keep time without blocking the web server.
 
-  // OLED: same layout as the web page. Only when no phone is connected, the
-  // join-the-WiFi screen takes over for 3 s out of every 15 s.
-  if (WiFi.softAPgetStationNum() == 0 && (millis() / 3000) % 5 == 0) {
+  // OLED: same layout as the web page. Only when no phone is connected, and
+  // never during a warning, the join-the-WiFi screen takes over for 3 s out of
+  // every 15 s. The demo build never shows it.
+  if (!DEMO_SENSOR_DATA && level < 2 && WiFi.softAPgetStationNum() == 0 && (millis() / 3000) % 5 == 0) {
     drawOledConnect();
   } else {
     drawOled(level, tdsPpm, flowRateLPM, flowPulses / FLOW_PULSES_PER_LITER, tempC, tempOk);
