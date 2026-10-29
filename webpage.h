@@ -239,7 +239,8 @@ body.lost .banner{display:block}
         <section>
           <h2>Raw readings</h2>
           <dl>
-            <dt>TDS, compensated</dt><dd id="rTds">—</dd>
+            <dt>TDS, as measured</dt><dd id="rRaw">—</dd>
+            <dt>TDS, corrected</dt><dd id="rTds">—</dd>
             <dt>TDS probe voltage</dt><dd id="rMv">—</dd>
             <dt>Water temperature</dt><dd id="rTemp">—</dd>
             <dt>Last update</dt><dd id="rAge">—</dd>
@@ -325,7 +326,7 @@ function render(d){
 
   tag($("sTds"),d.tds.ok?"Responding":"Not found",d.tds.ok?"good":"bad");
   tag($("sFlow"),d.flow.seen?"Pulses detected":"No pulses yet",d.flow.seen?"good":"warn");
-  tag($("sTemp"),d.temp.ok?"Responding":"Not fitted");
+  tag($("sTemp"),d.temp.ok?"Responding":"Not fitted",d.temp.ok?"good":"");
   tag($("sPh"),"Not fitted");
   var dr=d.drift||{n:0,active:false,pct:0,recal:false,ref:342,limit:15};
   var calTxt=dr.recal?"Recalibrate":dr.active?"Correcting drift":"Not calibrated",calCls=dr.recal?"bad":dr.active?"good":"warn";
@@ -338,7 +339,8 @@ function render(d){
     dr.active?"Record a checkpoint every day or two to keep the correction accurate. Put the probe in the "+dr.ref+" ppm reference solution first.":
     "To correct sensor aging, put the probe in the "+dr.ref+" ppm reference solution, wait until the reading settles, then record a checkpoint. Two checkpoints on different days start the correction.";
 
-  $("rTds").textContent=ppm==null?"—":fmt(ppm,1)+" ppm";
+  $("rTds").textContent=ppm==null?"—":fmt(ppm,1)+" ppm"+(d.temp.ok?"":" (no temp correction)");
+  $("rRaw").textContent=(ppm==null||d.tds.raw==null)?"—":fmt(d.tds.raw,1)+" ppm";
   $("rMv").textContent=d.tds.ok?fmt(d.tds.mv,0)+" mV":"—";
   $("rTemp").textContent=d.temp.ok?fmt(d.temp.c,1)+" °C":"Not fitted (25 °C assumed)";
   $("dSsid").textContent=d.net.ssid;
@@ -401,7 +403,7 @@ function demoTick(){
     "TDS rising steadily past the safe threshold. Possible mineral, salt, or gradual contamination build-up. Consider manual testing.",
     "Severe TDS spike detected. Possible heavy contamination event. Water supply automatically shut off as a precaution."];
   render({uptime:Math.floor(secs)+5400,verdict:{level:lv,label:LABELS[lv],message:msgs[lv]},
-    tds:{ppm:ppm,mv:ppm*1.9,ok:true,calibrated:false,safeMax:500,severeMax:1000},
+    tds:{ppm:ppm,raw:ppm*1.04,mv:ppm*1.9,ok:true,calibrated:false,safeMax:500,severeMax:1000},
     flow:{lpm:lv===3?0:2.4+Math.sin(secs/3),total:184.6+secs/20,pulses:Math.floor(83000+secs*18),ok:true,seen:true},
     temp:{c:25+2.5*Math.sin(secs/9),ok:true},ph:{ok:false},
     net:{ssid:"PaaniGuard",ip:"192.168.4.1",clients:2},sys:{heap:31200},
