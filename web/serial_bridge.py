@@ -123,7 +123,7 @@ def status():
         "uptime": int(time.time() - started),
         "demo": args.demo or st["demo"],
         "verdict": {"level": st["level"], "message": MESSAGES[st["level"]]},
-        "tds": {"ppm": st["ppm"], "mv": volts_from_ppm(st["ppm"]) * 1000, "ok": True,
+        "tds": {"ppm": st["ppm"], "raw": None, "mv": volts_from_ppm(st["ppm"]) * 1000, "ok": True,
                 "calibrated": False, "safeMax": SAFE_MAX, "severeMax": SEVERE_MAX},
         "flow": {"lpm": st["lpm"], "total": st["pulses"] / PULSES_PER_LITER,
                  "pulses": st["pulses"], "ok": True, "seen": st["pulses"] > 0},

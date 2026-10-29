@@ -70,7 +70,7 @@ static void handleStatus() {
   snprintf(buf, sizeof buf,
     "{\"uptime\":%lu,\"demo\":%s,"
     "\"verdict\":{\"level\":%d,\"message\":%s},"
-    "\"tds\":{\"ppm\":%.1f,\"mv\":%.0f,\"ok\":%s,\"calibrated\":%s,\"safeMax\":%d,\"severeMax\":%d},"
+    "\"tds\":{\"ppm\":%.1f,\"raw\":%.1f,\"mv\":%.0f,\"ok\":%s,\"calibrated\":%s,\"safeMax\":%d,\"severeMax\":%d},"
     "\"flow\":{\"lpm\":%.2f,\"total\":%.2f,\"pulses\":%lu,\"ok\":true,\"seen\":%s},"
     "\"temp\":{\"c\":%.1f,\"ok\":%s},\"ph\":{\"ok\":false},"
     "\"net\":{\"ssid\":\"%s\",\"ip\":\"%s\",\"clients\":%d},"
@@ -79,7 +79,7 @@ static void handleStatus() {
     "\"contact\":%s}",
     millis() / 1000UL, demoData ? "true" : "false",
     (int)lastFingerprint.severity, msg,
-    lastCorrectedTdsPpm, lastReadings.tds_voltage_mV, tdsOk ? "true" : "false",
+    lastCorrectedTdsPpm, lastReadings.tds_raw_ppm, lastReadings.tds_voltage_mV, tdsOk ? "true" : "false",
     tdsCalibrated ? "true" : "false", (int)TDS_SAFE_MAX_PPM, (int)TDS_SEVERE_MAX_PPM,
     lastReadings.flowRateLPM, lastReadings.totalLiters, lastFlowPulses, flowSeen ? "true" : "false",
     lastReadings.temperatureC, tempOk ? "true" : "false",
